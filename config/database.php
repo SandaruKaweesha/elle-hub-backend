@@ -6,7 +6,7 @@ ini_set('display_errors', 1);
 $host = "ellehub-mysql.mysql.database.azure.com";
 $dbname = "elle_hub";
 $username = "ellehubadmin";
-$password = "admin@1234";
+$password = "admin@4444";
 
 $conn = mysqli_init();
 
@@ -32,6 +32,7 @@ mysqli_real_connect(
 
 if (!$conn) {
     die("Connection Failed");
-}
+}else{
 
-echo "Connection Successful";
+    echo "Connection Successful ";
+}
