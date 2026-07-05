@@ -1,5 +1,7 @@
 <?php
 
+namespace model;
+
 require_once "User.php";
 
 class Referee extends User
@@ -26,7 +28,8 @@ class Referee extends User
         $experienceYears = null,
         $contactNumber = null,
         $rating = null
-    ) {
+    )
+    {
         parent::__construct(
             $userId,
             $email,
