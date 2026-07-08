@@ -1,14 +1,19 @@
 <?php
 require_once __DIR__ . "/../model/User.php";
+
+require_once __DIR__ . "/../repository/OrganizerRepository.php";
 require_once __DIR__ . "/../repository/UserRepository.php";
 require_once __DIR__ . "/../repository/TeamRepository.php";
 class UserService{
     private $userRepository=null;
     private $teamRepository=null;
+    private $organizerRepository=null;
 
     public function __construct(){
         $this->userRepository=new UserRepository();
         $this->teamRepository=new TeamRepository();
+        $this->organizerRepository=new OrganizerRepository();
+
     }
 
 
@@ -36,9 +41,10 @@ class UserService{
         //echo "<br>User ID inside Team object: ";
         var_dump($user->getUserId());
 
-
         if ($user instanceof Team) {
             $this->teamRepository->save($user);
+        }elseif ($user instanceof Organizer) {
+            $this->organizerRepository->save($user);
         }
 
         // 5. Return a response

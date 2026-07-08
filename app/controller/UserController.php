@@ -2,6 +2,7 @@
 
 require_once __DIR__ . "/../model/User.php";
 require_once __DIR__ . "/../model/Team.php";
+require_once __DIR__ . "/../model/Organizer.php";
 require_once __DIR__ . "/../service/UserService.php";
 class UserController{
     private  $userService;
@@ -14,18 +15,26 @@ class UserController{
 
         switch ($requestObject->role){
             case "TEAM":
-
-//               this going to the user
                 $user = new Team();
-                $user->setEmail($requestObject->email);
-                $user->setPassword($requestObject->password);
-                $user->setRole($requestObject->role);
-
 //              this going ot the team
                 $user->setTeamName($requestObject->teamName);
                 $user->setDistrict($requestObject->district);
                 $user->setContactNumber($requestObject->contactNumber);
+
+                break;
+
+            case  "ORGANIZER":
+                $user = new Organizer();
+//              This going to the Organizer
+                $user->setOrganizationName($requestObject->organizationName);
+                $user->setContactNumber($requestObject->contactNumber);
+                $user->setAddress($requestObject->address);
+                break;
         }
+
+        $user->setEmail($requestObject->email);
+        $user->setPassword($requestObject->password);
+        $user->setRole($requestObject->role);
 
         $result=$this->userService->registerUser($user);
 
