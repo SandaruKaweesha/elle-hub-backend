@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . "/../model/User.php";
+require_once __DIR__ . "/../model/Team.php";
 require_once __DIR__ . "/../service/UserService.php";
 class UserController{
     private  $userService;
@@ -11,11 +12,21 @@ class UserController{
         $requestBody = file_get_contents("php://input");
         $requestObject = json_decode($requestBody);
 
-        $user = new User();
+        switch ($requestObject->role){
+            case "TEAM":
 
-        $user->setEmail($requestObject->email);
-        $user->setPassword($requestObject->password);
-        $user->setRole($requestObject->role);
+//               this going to the user
+                $user = new Team();
+                $user->setEmail($requestObject->email);
+                $user->setPassword($requestObject->password);
+                $user->setRole($requestObject->role);
+
+//              this going ot the team
+                $user->setTeamName($requestObject->teamName);
+                $user->setDistrict($requestObject->district);
+                $user->setContactNumber($requestObject->contactNumber);
+        }
+
         $result=$this->userService->registerUser($user);
 
         echo "<pre>";
