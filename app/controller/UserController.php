@@ -2,6 +2,7 @@
 
 require_once __DIR__ . "/../model/User.php";
 require_once __DIR__ . "/../model/Team.php";
+require_once __DIR__ . "/../model/Sponsor.php";
 require_once __DIR__ . "/../model/Organizer.php";
 require_once __DIR__ . "/../service/UserService.php";
 class UserController{
@@ -27,6 +28,14 @@ class UserController{
                 $user = new Organizer();
 //              This going to the Organizer
                 $user->setOrganizationName($requestObject->organizationName);
+                $user->setContactNumber($requestObject->contactNumber);
+                $user->setAddress($requestObject->address);
+                break;
+
+            case "SPONSOR":
+                $user = new Sponsor();
+                $user->setCompanyName($requestObject->companyName);
+                $user->setContactPerson($requestObject->contactPerson);
                 $user->setContactNumber($requestObject->contactNumber);
                 $user->setAddress($requestObject->address);
                 break;
