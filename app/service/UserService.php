@@ -5,17 +5,20 @@ require_once __DIR__ . "/../repository/OrganizerRepository.php";
 require_once __DIR__ . "/../repository/UserRepository.php";
 require_once __DIR__ . "/../repository/TeamRepository.php";
 require_once __DIR__ . "/../repository/SponsorRepository.php";
+require_once __DIR__ . "/../repository/PlaygroundRepository.php";
 class UserService{
     private $userRepository=null;
     private $teamRepository=null;
     private $organizerRepository=null;
     private $sponsorRepository=null;
+    private $playgroundRepository=null;
 
     public function __construct(){
         $this->userRepository=new UserRepository();
         $this->teamRepository=new TeamRepository();
         $this->organizerRepository=new OrganizerRepository();
         $this->sponsorRepository=new SponsorRepository();
+        $this->playgroundRepository=new PlaygroundRepository();
     }
 
 
@@ -49,6 +52,8 @@ class UserService{
             $this->organizerRepository->save($user);
         }elseif ($user instanceof Sponsor) {
             $this->sponsorRepository->save($user);
+        }elseif ($user instanceof Playground) {
+            $this->playgroundRepository->save($user);
         }
 
         // 5. Return a response

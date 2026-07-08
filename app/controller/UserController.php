@@ -4,6 +4,7 @@ require_once __DIR__ . "/../model/User.php";
 require_once __DIR__ . "/../model/Team.php";
 require_once __DIR__ . "/../model/Sponsor.php";
 require_once __DIR__ . "/../model/Organizer.php";
+require_once __DIR__ . "/../model/Playground.php";
 require_once __DIR__ . "/../service/UserService.php";
 class UserController{
     private  $userService;
@@ -39,6 +40,16 @@ class UserController{
                 $user->setContactNumber($requestObject->contactNumber);
                 $user->setAddress($requestObject->address);
                 break;
+
+            case "PLAYGROUND":
+                $user = new Playground();
+                $user->setPlaygroundName($requestObject->playgroundName);
+                $user->setLocation($requestObject->location);
+                $user->setAddress($requestObject->address);
+                $user->setContactNumber($requestObject->contactNumber);
+                $user->setCapacity($requestObject->capacity);
+                break;
+
         }
 
         $user->setEmail($requestObject->email);
