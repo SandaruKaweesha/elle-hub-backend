@@ -1,7 +1,5 @@
 <?php
-
-class User
-{
+class User{
     private $userId;
     private $email;
     private $password;
@@ -25,7 +23,8 @@ class User
         $approvedDate = null,
         $lastLogin = null,
         $createdAt = null
-    ) {
+    )
+    {
         $this->userId = $userId;
         $this->email = $email;
         $this->password = $password;
@@ -37,6 +36,7 @@ class User
         $this->lastLogin = $lastLogin;
         $this->createdAt = $createdAt;
     }
+
 
     // Getters
 

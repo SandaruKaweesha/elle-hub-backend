@@ -1,5 +1,7 @@
 <?php
 
+namespace model;
+
 require_once "User.php";
 
 class Playground extends User
@@ -27,7 +29,8 @@ class Playground extends User
         $address = null,
         $contactNumber = null,
         $capacity = null
-    ) {
+    )
+    {
 
         parent::__construct(
             $userId,

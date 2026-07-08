@@ -1,13 +1,14 @@
 <?php
 
+namespace model;
+
 require_once "User.php";
 
-class Team extends User
+class Organizer extends User
 {
-    private $teamName;
-    private $district;
+    private $organizationName;
+    private $address;
     private $contactNumber;
-    private $rating;
 
     // Constructor
     public function __construct(
@@ -22,11 +23,11 @@ class Team extends User
         $lastLogin = null,
         $createdAt = null,
 
-        $teamName = null,
-        $district = null,
-        $contactNumber = null,
-        $rating = null
-    ) {
+        $organizationName = null,
+        $address = null,
+        $contactNumber = null
+    )
+    {
         parent::__construct(
             $userId,
             $email,
@@ -40,22 +41,21 @@ class Team extends User
             $createdAt
         );
 
-        $this->teamName = $teamName;
-        $this->district = $district;
+        $this->organizationName = $organizationName;
+        $this->address = $address;
         $this->contactNumber = $contactNumber;
-        $this->rating = $rating;
     }
 
     // Getters
 
-    public function getTeamName()
+    public function getOrganizationName()
     {
-        return $this->teamName;
+        return $this->organizationName;
     }
 
-    public function getDistrict()
+    public function getAddress()
     {
-        return $this->district;
+        return $this->address;
     }
 
     public function getContactNumber()
@@ -63,30 +63,20 @@ class Team extends User
         return $this->contactNumber;
     }
 
-    public function getRating()
-    {
-        return $this->rating;
-    }
-
     // Setters
 
-    public function setTeamName($teamName)
+    public function setOrganizationName($organizationName)
     {
-        $this->teamName = $teamName;
+        $this->organizationName = $organizationName;
     }
 
-    public function setDistrict($district)
+    public function setAddress($address)
     {
-        $this->district = $district;
+        $this->address = $address;
     }
 
     public function setContactNumber($contactNumber)
     {
         $this->contactNumber = $contactNumber;
-    }
-
-    public function setRating($rating)
-    {
-        $this->rating = $rating;
     }
 }
