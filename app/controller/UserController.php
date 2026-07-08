@@ -3,6 +3,8 @@
 require_once __DIR__ . "/../model/User.php";
 require_once __DIR__ . "/../model/Team.php";
 require_once __DIR__ . "/../model/Sponsor.php";
+
+require_once __DIR__ . "/../model/Referee.php";
 require_once __DIR__ . "/../model/Organizer.php";
 require_once __DIR__ . "/../model/Playground.php";
 require_once __DIR__ . "/../service/UserService.php";
@@ -49,6 +51,21 @@ class UserController{
                 $user->setContactNumber($requestObject->contactNumber);
                 $user->setCapacity($requestObject->capacity);
                 break;
+
+            case "REFEREE":
+                $user = new Referee();
+                $user->setFullName($requestObject->fullName);
+                $user->setExperienceYears($requestObject->experienceYears);
+                $user->setContactNumber($requestObject->contactNumber);
+                $user->setRating($requestObject->rating);
+                break;
+
+            default:
+                echo json_encode([
+                    "success" => false,
+                    "message" => "Invalid role"
+                ]);
+                return;
 
         }
 

@@ -4,6 +4,7 @@ require_once __DIR__ . "/../model/User.php";
 require_once __DIR__ . "/../repository/OrganizerRepository.php";
 require_once __DIR__ . "/../repository/UserRepository.php";
 require_once __DIR__ . "/../repository/TeamRepository.php";
+require_once __DIR__ . "/../repository/RefereeRepository.php";
 require_once __DIR__ . "/../repository/SponsorRepository.php";
 require_once __DIR__ . "/../repository/PlaygroundRepository.php";
 class UserService{
@@ -12,6 +13,7 @@ class UserService{
     private $organizerRepository=null;
     private $sponsorRepository=null;
     private $playgroundRepository=null;
+    private $refereeRepository=null;
 
     public function __construct(){
         $this->userRepository=new UserRepository();
@@ -19,6 +21,7 @@ class UserService{
         $this->organizerRepository=new OrganizerRepository();
         $this->sponsorRepository=new SponsorRepository();
         $this->playgroundRepository=new PlaygroundRepository();
+        $this->refereeRepository=new RefereeRepository();
     }
 
 
@@ -44,7 +47,7 @@ class UserService{
         $user->setUserId($userId);
         //Temapary Code
         //echo "<br>User ID inside Team object: ";
-        var_dump($user->getUserId());
+//        var_dump($user->getUserId());
 
         if ($user instanceof Team) {
             $this->teamRepository->save($user);
@@ -54,6 +57,8 @@ class UserService{
             $this->sponsorRepository->save($user);
         }elseif ($user instanceof Playground) {
             $this->playgroundRepository->save($user);
+        }elseif ($user instanceof Referee) {
+            $this->refereeRepository->save($user);
         }
 
         // 5. Return a response

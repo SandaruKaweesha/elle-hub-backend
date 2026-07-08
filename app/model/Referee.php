@@ -1,6 +1,5 @@
 <?php
 
-namespace model;
 
 require_once "User.php";
 
