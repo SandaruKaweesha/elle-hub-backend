@@ -24,7 +24,6 @@ class UserController{
                 $user->setTeamName($requestObject->teamName);
                 $user->setDistrict($requestObject->district);
                 $user->setContactNumber($requestObject->contactNumber);
-
                 break;
 
             case  "ORGANIZER":
@@ -68,15 +67,12 @@ class UserController{
                 return;
 
         }
-
         $user->setEmail($requestObject->email);
         $user->setPassword($requestObject->password);
         $user->setRole($requestObject->role);
 
         $result=$this->userService->registerUser($user);
 
-        echo "<pre>";
-        print_r($result);
-        echo "</pre>";
+        echo json_encode($result);
     }
 }

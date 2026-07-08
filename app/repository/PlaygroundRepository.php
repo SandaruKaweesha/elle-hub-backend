@@ -4,12 +4,10 @@ require_once __DIR__ . "/../model/Playground.php";
 require_once __DIR__ . "/../model/User.php";
 class PlaygroundRepository {
     private PDO $connection;
-
     public function __construct()
     {
         $this->connection = Database::getConnection();
     }
-
     public function save(Playground $playground): bool
     {
         $sql = "INSERT INTO playgrounds

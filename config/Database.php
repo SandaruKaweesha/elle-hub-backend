@@ -39,4 +39,18 @@ class Database
 
         return self::$connection;
     }
+    public static function beginTransaction()
+    {
+        self::getConnection()->beginTransaction();
+    }
+
+    public static function commit()
+    {
+        self::getConnection()->commit();
+    }
+
+    public static function rollback()
+    {
+        self::getConnection()->rollBack();
+    }
 }

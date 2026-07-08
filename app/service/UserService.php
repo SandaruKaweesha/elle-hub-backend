@@ -14,7 +14,6 @@ class UserService{
     private $sponsorRepository=null;
     private $playgroundRepository=null;
     private $refereeRepository=null;
-
     public function __construct(){
         $this->userRepository=new UserRepository();
         $this->teamRepository=new TeamRepository();
@@ -24,8 +23,9 @@ class UserService{
         $this->refereeRepository=new RefereeRepository();
     }
 
-
-    public function registerUser(User $user){
+    public function registerUser(User $user)
+    {
+        // Check whether the email already exists
         if ($this->userRepository->existsByEmail($user->getEmail())) {
             return [
                 "success" => false,
@@ -33,38 +33,58 @@ class UserService{
             ];
         }
 
+        // Set default values
         $user->setStatus("PENDING");
-        $user->setPassword(password_hash(
-            $user->getPassword(),
-            PASSWORD_DEFAULT
-        ));
-        $userId = $this->userRepository->save($user);
-        //Temapary Code
-        //echo "Generated User ID: ";
-        //var_dump($userId);
 
+        // Hash the password
+        $user->setPassword(
+            password_hash(
+                $user->getPassword(),
+                PASSWORD_DEFAULT
+            )
+        );
 
-        $user->setUserId($userId);
-        //Temapary Code
-        //echo "<br>User ID inside Team object: ";
-//        var_dump($user->getUserId());
+        try {
+            // Start Transaction
+            Database::beginTransaction();
+            // Save common user information
+            $userId = $this->userRepository->save($user);
 
-        if ($user instanceof Team) {
-            $this->teamRepository->save($user);
-        }elseif ($user instanceof Organizer) {
-            $this->organizerRepository->save($user);
-        }elseif ($user instanceof Sponsor) {
-            $this->sponsorRepository->save($user);
-        }elseif ($user instanceof Playground) {
-            $this->playgroundRepository->save($user);
-        }elseif ($user instanceof Referee) {
-            $this->refereeRepository->save($user);
+            // Set generated user ID
+            $user->setUserId($userId);
+            // Save role-specific information
+            if ($user instanceof Team) {
+                $this->teamRepository->save($user);
+            } elseif ($user instanceof Organizer) {
+                $this->organizerRepository->save($user);
+            } elseif ($user instanceof Sponsor) {
+                $this->sponsorRepository->save($user);
+            } elseif ($user instanceof Playground) {
+                $this->playgroundRepository->save($user);
+            } elseif ($user instanceof Referee) {
+                $this->refereeRepository->save($user);
+
+            }
+
+            // Everything succeeded
+            Database::commit();
+
+            return [
+                "success" => true,
+                "message" => "Registration successful."
+            ];
+
+        } catch (Exception $e) {
+
+            // Something failed, undo everything
+            Database::rollback();
+
+            return [
+                "success" => false,
+                "message" => $e->getMessage()
+            ];
         }
-
-        // 5. Return a response
-        return [
-            "success" => true,
-            "message" => "Registration successful."
-        ];
     }
+
+
 }
