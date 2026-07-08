@@ -20,9 +20,9 @@ class UserRepository{
         return $count > 0;
     }
 
-    public function save(User $user){
+    public function save(User $user):int{
         $sql = "INSERT INTO users (email, password, role, status)
-                VALUES (:email, :password, :role, :status)";
+            VALUES (:email, :password, :role, :status)";
 
         $statement = $this->connection->prepare($sql);
 
@@ -31,6 +31,8 @@ class UserRepository{
         $statement->bindValue(":role", $user->getRole());
         $statement->bindValue(":status", $user->getStatus());
 
-        return $statement->execute();
+        $statement->execute();
+
+        return (int) $this->connection->lastInsertId();
     }
 }
