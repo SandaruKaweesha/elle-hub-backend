@@ -38,5 +38,43 @@ class TournamentController{
         header("Content-Type: application/json");
         echo json_encode($result);
     }
+
+
+//    In here We are geting the Pending tournaments that show insdie of the Admin Side
+    public function getPendingTournaments()
+    {
+        $result = $this->tournamentService->getPendingTournaments();
+
+        header("Content-Type: application/json");
+        echo json_encode($result);
+    }
+
+//    Update the Status
+    public function updateTournamentStatus($tournamentId)
+    {
+        $requestBody = file_get_contents("php://input");
+        $request = json_decode($requestBody);
+
+        if (!isset($request->status)) {
+
+            echo json_encode([
+                "success" => false,
+                "message" => "Tournament status is required."
+            ]);
+
+            return ;
+        }
+
+        $result = $this->tournamentService->updateTournamentStatus(
+            (int)$tournamentId,
+            strtoupper($request->status)
+        );
+
+        header("Content-Type: application/json");
+
+        echo json_encode($result);
+    }
+
+
 }
 

@@ -37,5 +37,82 @@ class TournamentService{
             ];
         }
     }
+
+    /**
+     * Retrieve tournaments that match status = PENDING
+     */
+    public function getPendingTournaments(): array
+    {
+        $rows = $this->tournamentRepository->findByStatus("PENDING");
+
+        if (empty($rows)) {
+            return [
+                "success" => true,
+                "message" => "No pending tournaments found.",
+                "data" => []
+            ];
+        }
+
+        return [
+            "success" => true,
+            "message" => "Pending tournaments retrieved successfully.",
+            "data" => $rows
+        ];
+    }
+
+//    Update the Status
+    public function updateTournamentStatus(
+        int $tournamentId,
+        string $status
+    ): array
+    {
+        $allowedStatus = [
+            "APPROVED",
+            "REJECTED",
+            "CANCELLED"
+        ];
+
+        if (!in_array($status, $allowedStatus)) {
+
+            return [
+                "success" => false,
+                "message" => "Invalid tournament status."
+            ];
+        }
+
+        $tournament = $this->tournamentRepository->findById($tournamentId);
+
+        if (!$tournament) {
+
+            return [
+                "success" => false,
+                "message" => "Tournament not found."
+            ];
+        }
+
+        if ($tournament["status"] == $status) {
+
+            return [
+                "success" => false,
+                "message" => "Tournament is already in this status."
+            ];
+        }
+
+        $updated = $this->tournamentRepository
+            ->updateStatus($tournamentId, $status);
+
+        if (!$updated) {
+
+            return [
+                "success" => false,
+                "message" => "Failed to update tournament status."
+            ];
+        }
+
+        return [
+            "success" => true,
+            "message" => "Tournament status updated successfully."
+        ];
+    }
 }
 

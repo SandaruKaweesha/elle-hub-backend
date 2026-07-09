@@ -57,5 +57,76 @@ class TournamentRepository{
 
         return (int) $this->connection->lastInsertId();
     }
+
+    /**
+     * Find tournaments by status.
+     * Reusable for PENDING, APPROVED, REJECTED, etc.
+     */
+    public function findByStatus(string $status): array
+    {
+        $sql = "SELECT * FROM tournaments WHERE status = :status";
+        $statement = $this->connection->prepare($sql);
+        $statement->bindValue(":status", $status);
+        $statement->execute();
+
+        $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
+
+        return $rows;
+    }
+
+//  Find By the ID
+    public function findById(int $tournamentId): ?array
+    {
+        $sql = "SELECT * FROM tournaments WHERE tournament_id = :tournament_id";
+
+        $statement = $this->connection->prepare($sql);
+
+        $statement->bindValue(
+            ":tournament_id",
+            $tournamentId,
+            PDO::PARAM_INT
+        );
+
+        $statement->execute();
+
+        $tournament = $statement->fetch(PDO::FETCH_ASSOC);
+
+        if (!$tournament) {
+            return null;
+        }
+
+        return $tournament;
+    }
+
+
+//    Update the Status
+    public function updateStatus(
+        int $tournamentId,
+        string $status
+    ): bool
+    {
+        $sql = "
+        UPDATE tournaments
+        SET status = :status
+        WHERE tournament_id = :tournament_id
+    ";
+
+        $statement = $this->connection->prepare($sql);
+
+        $statement->bindValue(
+            ":status",
+            $status
+        );
+
+        $statement->bindValue(
+            ":tournament_id",
+            $tournamentId,
+            PDO::PARAM_INT
+        );
+
+        $statement->execute();
+
+        return $statement->rowCount() > 0;
+    }
 }
 
