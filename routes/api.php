@@ -3,7 +3,7 @@
 
 require_once __DIR__ . "/userRoutes.php";
 
-//require_once __DIR__ . "/tournamentRoutes.php";
+require_once __DIR__ . "/tournamentRoutes.php";
 //
 //require_once __DIR__ . "/playerRoutes.php";
 //
