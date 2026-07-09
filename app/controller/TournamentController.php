@@ -49,16 +49,32 @@ class TournamentController{
         echo json_encode($result);
     }
 
-
-//    Cancel Tournament In here We are not going to the dalete the record from the database we are just going to change the status of the tournament to canceled
-    public function cancelTournament($tournamentId)
+//    Update the Status
+    public function updateTournamentStatus($tournamentId)
     {
-        $result = $this->tournamentService
-            ->cancelTournament((int) $tournamentId);
+        $requestBody = file_get_contents("php://input");
+        $request = json_decode($requestBody);
+
+        if (!isset($request->status)) {
+
+            echo json_encode([
+                "success" => false,
+                "message" => "Tournament status is required."
+            ]);
+
+            return ;
+        }
+
+        $result = $this->tournamentService->updateTournamentStatus(
+            (int)$tournamentId,
+            strtoupper($request->status)
+        );
 
         header("Content-Type: application/json");
 
         echo json_encode($result);
     }
+
+
 }
 

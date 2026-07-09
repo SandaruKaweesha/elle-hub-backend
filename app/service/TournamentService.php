@@ -60,22 +60,58 @@ class TournamentService{
         ];
     }
 
-//    Cancel the Tournament
-    public function cancelTournament(int $tournamentId): array
+//    Update the Status
+    public function updateTournamentStatus(
+        int $tournamentId,
+        string $status
+    ): array
     {
-        $cancelled = $this->tournamentRepository
-            ->updateStatus($tournamentId, "CANCELLED");
+        $allowedStatus = [
+            "APPROVED",
+            "REJECTED",
+            "CANCELLED"
+        ];
 
-        if (!$cancelled) {
+        if (!in_array($status, $allowedStatus)) {
+
             return [
                 "success" => false,
-                "message" => "Tournament not found or could not be cancelled."
+                "message" => "Invalid tournament status."
+            ];
+        }
+
+        $tournament = $this->tournamentRepository->findById($tournamentId);
+
+        if (!$tournament) {
+
+            return [
+                "success" => false,
+                "message" => "Tournament not found."
+            ];
+        }
+
+        if ($tournament["status"] == $status) {
+
+            return [
+                "success" => false,
+                "message" => "Tournament is already in this status."
+            ];
+        }
+
+        $updated = $this->tournamentRepository
+            ->updateStatus($tournamentId, $status);
+
+        if (!$updated) {
+
+            return [
+                "success" => false,
+                "message" => "Failed to update tournament status."
             ];
         }
 
         return [
             "success" => true,
-            "message" => "Tournament cancelled successfully."
+            "message" => "Tournament status updated successfully."
         ];
     }
 }

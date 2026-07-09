@@ -74,13 +74,42 @@ class TournamentRepository{
         return $rows;
     }
 
-
-//    Update the Status(Cancel)
-    public function updateStatus(int $tournamentId, string $status): bool
+//  Find By the ID
+    public function findById(int $tournamentId): ?array
     {
-        $sql = "UPDATE tournaments
-            SET status = :status
-            WHERE tournament_id = :tournament_id";
+        $sql = "SELECT * FROM tournaments WHERE tournament_id = :tournament_id";
+
+        $statement = $this->connection->prepare($sql);
+
+        $statement->bindValue(
+            ":tournament_id",
+            $tournamentId,
+            PDO::PARAM_INT
+        );
+
+        $statement->execute();
+
+        $tournament = $statement->fetch(PDO::FETCH_ASSOC);
+
+        if (!$tournament) {
+            return null;
+        }
+
+        return $tournament;
+    }
+
+
+//    Update the Status
+    public function updateStatus(
+        int $tournamentId,
+        string $status
+    ): bool
+    {
+        $sql = "
+        UPDATE tournaments
+        SET status = :status
+        WHERE tournament_id = :tournament_id
+    ";
 
         $statement = $this->connection->prepare($sql);
 
