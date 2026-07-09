@@ -73,5 +73,31 @@ class TournamentRepository{
 
         return $rows;
     }
+
+
+//    Update the Status(Cancel)
+    public function updateStatus(int $tournamentId, string $status): bool
+    {
+        $sql = "UPDATE tournaments
+            SET status = :status
+            WHERE tournament_id = :tournament_id";
+
+        $statement = $this->connection->prepare($sql);
+
+        $statement->bindValue(
+            ":status",
+            $status
+        );
+
+        $statement->bindValue(
+            ":tournament_id",
+            $tournamentId,
+            PDO::PARAM_INT
+        );
+
+        $statement->execute();
+
+        return $statement->rowCount() > 0;
+    }
 }
 

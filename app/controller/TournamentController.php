@@ -39,11 +39,25 @@ class TournamentController{
         echo json_encode($result);
     }
 
+
+//    In here We are geting the Pending tournaments that show insdie of the Admin Side
     public function getPendingTournaments()
     {
         $result = $this->tournamentService->getPendingTournaments();
 
         header("Content-Type: application/json");
+        echo json_encode($result);
+    }
+
+
+//    Cancel Tournament In here We are not going to the dalete the record from the database we are just going to change the status of the tournament to canceled
+    public function cancelTournament($tournamentId)
+    {
+        $result = $this->tournamentService
+            ->cancelTournament((int) $tournamentId);
+
+        header("Content-Type: application/json");
+
         echo json_encode($result);
     }
 }

@@ -11,3 +11,7 @@ $router->get(
     "/admin/tournaments/pending",
     [TournamentController::class, "getPendingTournaments"]
 );
+$router->delete(
+    "/organizer/tournament/cancel/{id}",
+    [TournamentController::class, "cancelTournament"]
+);

@@ -59,5 +59,24 @@ class TournamentService{
             "data" => $rows
         ];
     }
+
+//    Cancel the Tournament
+    public function cancelTournament(int $tournamentId): array
+    {
+        $cancelled = $this->tournamentRepository
+            ->updateStatus($tournamentId, "CANCELLED");
+
+        if (!$cancelled) {
+            return [
+                "success" => false,
+                "message" => "Tournament not found or could not be cancelled."
+            ];
+        }
+
+        return [
+            "success" => true,
+            "message" => "Tournament cancelled successfully."
+        ];
+    }
 }
 
