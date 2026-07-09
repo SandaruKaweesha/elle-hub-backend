@@ -96,5 +96,23 @@ class UserService{
         ];
     }
 
+    public function getUserById(int $userId): array
+    {
+        $user = $this->userRepository->findById($userId);
+
+        if ($user === null) {
+            return [
+                "success" => false,
+                "message" => "User not found."
+            ];
+        }
+
+        return [
+            "success" => true,
+            "message" => "User retrieved successfully.",
+            "data" => $user
+        ];
+    }
+
 
 }

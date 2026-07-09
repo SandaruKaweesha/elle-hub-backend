@@ -78,11 +78,20 @@ class UserController{
 
 //Get All users
     public function getAllUsers()
-{
-    $result = $this->userService->getAllUsers();
+    {
+        $result = $this->userService->getAllUsers();
 
-    header("Content-Type: application/json");
+        header("Content-Type: application/json");
 
-    echo json_encode($result);
-}
+        echo json_encode($result);
+    }
+
+    public function getUserById($userId)
+    {
+        $result = $this->userService->getUserById((int) $userId);
+
+        header("Content-Type: application/json");
+
+        echo json_encode($result);
+    }
 }

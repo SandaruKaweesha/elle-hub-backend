@@ -16,12 +16,16 @@ $router->get(
     [UserController::class, "getAllUsers"]
 );
 
-
 // GET http://localhost/elle-hub-backend/user/search
 $router->get(
     "/user/search",
     [UserController::class, "searchUser"]
 );
+
+//GET http://localhost/elle-hub-backend/user/5
+$router->get(
+    "/user/{id}",
+    [UserController::class, "getUserById"]);
 
 
 // PUT http://localhost/elle-hub-backend/user/update
