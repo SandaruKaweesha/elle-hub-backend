@@ -69,4 +69,57 @@ class UserRepository{
         $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
         return $rows;
     }
+
+
+    public function findById(int $userId): ?array
+    {
+        $sql = "SELECT
+                user_id,
+                email,
+                role,
+                status,
+                profile_picture,
+                approved_by,
+                approved_date,
+                last_login,
+                created_at
+            FROM users
+            WHERE user_id = :user_id";
+
+        $statement = $this->connection->prepare($sql);
+        $statement->bindValue(
+            ":user_id",
+            $userId,
+            PDO::PARAM_INT
+        );
+
+        $statement->execute();
+
+        $user = $statement->fetch(PDO::FETCH_ASSOC);
+
+        if (!$user) {
+            return null;
+        }
+
+        return $user;
+    }
+
+//    Delete the user
+    public function deleteById(int $userId): bool
+    {
+        $sql = "DELETE FROM users
+            WHERE user_id = :user_id";
+
+        $statement = $this->connection->prepare($sql);
+
+        $statement->bindValue(
+            ":user_id",
+            $userId,
+            PDO::PARAM_INT
+        );
+
+        $statement->execute();
+
+        return $statement->rowCount() > 0;
+    }
 }

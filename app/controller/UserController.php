@@ -78,11 +78,38 @@ class UserController{
 
 //Get All users
     public function getAllUsers()
-{
-    $result = $this->userService->getAllUsers();
+    {
+        $result = $this->userService->getAllUsers();
 
-    header("Content-Type: application/json");
+        header("Content-Type: application/json");
 
-    echo json_encode($result);
-}
+        echo json_encode($result);
+    }
+
+
+//    Search by the id
+    public function getUserById($userId)
+    {
+        $result = $this->userService->getUserById((int) $userId);
+
+        header("Content-Type: application/json");
+
+        echo json_encode($result);
+    }
+
+//Delete user by the id
+    public function deleteUser($userId)
+    {
+        $result = $this->userService->deleteUser((int) $userId);
+
+        header("Content-Type: application/json");
+
+        if ($result["success"]) {
+            http_response_code(200);
+        } else {
+            http_response_code(404);
+        }
+
+        echo json_encode($result);
+    }
 }
