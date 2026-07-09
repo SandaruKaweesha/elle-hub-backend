@@ -115,4 +115,30 @@ class UserService{
     }
 
 
+//    Delete the user
+    public function deleteUser(int $userId): array
+    {
+        $user = $this->userRepository->findById($userId);
+
+        if ($user === null) {
+            return [
+                "success" => false,
+                "message" => "User not found."
+            ];
+        }
+
+        $deleted = $this->userRepository->deleteById($userId);
+
+        if (!$deleted) {
+            return [
+                "success" => false,
+                "message" => "Failed to delete user."
+            ];
+        }
+
+        return [
+            "success" => true,
+            "message" => "User deleted successfully."
+        ];
+    }
 }

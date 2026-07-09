@@ -103,4 +103,23 @@ class UserRepository{
 
         return $user;
     }
+
+//    Delete the user
+    public function deleteById(int $userId): bool
+    {
+        $sql = "DELETE FROM users
+            WHERE user_id = :user_id";
+
+        $statement = $this->connection->prepare($sql);
+
+        $statement->bindValue(
+            ":user_id",
+            $userId,
+            PDO::PARAM_INT
+        );
+
+        $statement->execute();
+
+        return $statement->rowCount() > 0;
+    }
 }

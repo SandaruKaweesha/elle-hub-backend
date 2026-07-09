@@ -9,7 +9,6 @@ $router->post(
     [UserController::class, "registerUser"]
 );
 
-
 // GET http://localhost/elle-hub-backend/user/getAllUsers
 $router->get(
     "/user/getAllUsers",
@@ -35,8 +34,8 @@ $router->put(
 );
 
 
-// DELETE http://localhost/elle-hub-backend/user/delete
+// DELETE http://localhost/elle-hub-backend/user/delete/5
 $router->delete(
-    "/user/delete",
+    "/user/delete/{id}",
     [UserController::class, "deleteUser"]
 );
