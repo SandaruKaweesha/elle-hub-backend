@@ -3,7 +3,10 @@
 require_once __DIR__ . "/../model/User.php";
 require_once __DIR__ . "/../model/Team.php";
 require_once __DIR__ . "/../model/Sponsor.php";
+
+require_once __DIR__ . "/../model/Referee.php";
 require_once __DIR__ . "/../model/Organizer.php";
+require_once __DIR__ . "/../model/Playground.php";
 require_once __DIR__ . "/../service/UserService.php";
 class UserController{
     private  $userService;
@@ -21,7 +24,6 @@ class UserController{
                 $user->setTeamName($requestObject->teamName);
                 $user->setDistrict($requestObject->district);
                 $user->setContactNumber($requestObject->contactNumber);
-
                 break;
 
             case  "ORGANIZER":
@@ -39,16 +41,48 @@ class UserController{
                 $user->setContactNumber($requestObject->contactNumber);
                 $user->setAddress($requestObject->address);
                 break;
-        }
 
+            case "PLAYGROUND":
+                $user = new Playground();
+                $user->setPlaygroundName($requestObject->playgroundName);
+                $user->setLocation($requestObject->location);
+                $user->setAddress($requestObject->address);
+                $user->setContactNumber($requestObject->contactNumber);
+                $user->setCapacity($requestObject->capacity);
+                break;
+
+            case "REFEREE":
+                $user = new Referee();
+                $user->setFullName($requestObject->fullName);
+                $user->setExperienceYears($requestObject->experienceYears);
+                $user->setContactNumber($requestObject->contactNumber);
+                $user->setRating($requestObject->rating);
+                break;
+
+            default:
+                echo json_encode([
+                    "success" => false,
+                    "message" => "Invalid role"
+                ]);
+                return;
+
+        }
         $user->setEmail($requestObject->email);
         $user->setPassword($requestObject->password);
         $user->setRole($requestObject->role);
 
         $result=$this->userService->registerUser($user);
 
-        echo "<pre>";
-        print_r($result);
-        echo "</pre>";
+        echo json_encode($result);
     }
+
+//Get All users
+    public function getAllUsers()
+{
+    $result = $this->userService->getAllUsers();
+
+    header("Content-Type: application/json");
+
+    echo json_encode($result);
+}
 }
