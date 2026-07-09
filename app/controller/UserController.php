@@ -75,4 +75,14 @@ class UserController{
 
         echo json_encode($result);
     }
+
+//Get All users
+    public function getAllUsers()
+{
+    $result = $this->userService->getAllUsers();
+
+    header("Content-Type: application/json");
+
+    echo json_encode($result);
+}
 }

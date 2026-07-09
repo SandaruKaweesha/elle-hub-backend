@@ -86,5 +86,15 @@ class UserService{
         }
     }
 
+    public function getAllUsers(): array
+    {
+        $users = $this->userRepository->findAll();
+        return [
+            "success" => true,
+            "message" => "Users retrieved successfully.",
+            "data" => $users
+        ];
+    }
+
 
 }

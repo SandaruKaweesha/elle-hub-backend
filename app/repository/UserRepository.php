@@ -61,4 +61,12 @@ class UserRepository{
         return $user;
     }
 
+    public function findAll(): array
+    {
+        $sql = "SELECT * FROM users";
+        $statement = $this->connection->prepare($sql);
+        $statement->execute();
+        $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
+        return $rows;
     }
+}
