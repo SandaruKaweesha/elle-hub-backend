@@ -38,5 +38,13 @@ class TournamentController{
         header("Content-Type: application/json");
         echo json_encode($result);
     }
+
+    public function getPendingTournaments()
+    {
+        $result = $this->tournamentService->getPendingTournaments();
+
+        header("Content-Type: application/json");
+        echo json_encode($result);
+    }
 }
 

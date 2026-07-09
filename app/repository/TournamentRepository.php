@@ -57,5 +57,21 @@ class TournamentRepository{
 
         return (int) $this->connection->lastInsertId();
     }
+
+    /**
+     * Find tournaments by status.
+     * Reusable for PENDING, APPROVED, REJECTED, etc.
+     */
+    public function findByStatus(string $status): array
+    {
+        $sql = "SELECT * FROM tournaments WHERE status = :status";
+        $statement = $this->connection->prepare($sql);
+        $statement->bindValue(":status", $status);
+        $statement->execute();
+
+        $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
+
+        return $rows;
+    }
 }
 

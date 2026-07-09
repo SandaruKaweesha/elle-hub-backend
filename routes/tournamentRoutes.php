@@ -7,3 +7,7 @@ $router->post(
     [TournamentController::class, "createTournament"]
 );
 
+$router->get(
+    "/admin/tournaments/pending",
+    [TournamentController::class, "getPendingTournaments"]
+);

@@ -37,5 +37,27 @@ class TournamentService{
             ];
         }
     }
+
+    /**
+     * Retrieve tournaments that match status = PENDING
+     */
+    public function getPendingTournaments(): array
+    {
+        $rows = $this->tournamentRepository->findByStatus("PENDING");
+
+        if (empty($rows)) {
+            return [
+                "success" => true,
+                "message" => "No pending tournaments found.",
+                "data" => []
+            ];
+        }
+
+        return [
+            "success" => true,
+            "message" => "Pending tournaments retrieved successfully.",
+            "data" => $rows
+        ];
+    }
 }
 
