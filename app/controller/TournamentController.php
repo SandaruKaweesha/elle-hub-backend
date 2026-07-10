@@ -3,6 +3,7 @@
 require_once __DIR__ . "/../service/TournamentService.php";
 require_once __DIR__ . "/../model/Tournament.php";
 class TournamentController{
+    private const JSON_HEADER = "Content-Type: application/json";
     private $tournamentService;
 
     public function __construct(){
@@ -35,7 +36,7 @@ class TournamentController{
             http_response_code(500);
         }
 
-        header("Content-Type: application/json");
+        header(self::JSON_HEADER);
         echo json_encode($result);
     }
 
@@ -45,11 +46,22 @@ class TournamentController{
     {
         $result = $this->tournamentService->getPendingTournaments();
 
-        header("Content-Type: application/json");
+        header(self::JSON_HEADER);
         echo json_encode($result);
     }
 
-//    Update the Status
+//    Search by Name Only get the Approved Tournaments that show inside of the Admin Side
+    public function getApprovedTournaments()
+    {
+        $search = $_GET["search"] ?? "";
+
+        $result = $this->tournamentService->getApprovedTournaments($search);
+
+        header(self::JSON_HEADER);
+        echo json_encode($result);
+    }
+
+//    Update the Status By the Organizer
     public function updateTournamentStatus($tournamentId)
     {
         $requestBody = file_get_contents("php://input");
@@ -70,11 +82,62 @@ class TournamentController{
             strtoupper($request->status)
         );
 
+        header(self::JSON_HEADER);
+
+        echo json_encode($result);
+    }
+
+
+
+//    Update the Approval Status By the Admin
+    public function updateApprovalStatus($tournamentId)
+    {
+        $requestBody = file_get_contents("php://input");
+
+        $request = json_decode($requestBody);
+
+        if (!isset($request->approvalStatus)) {
+
+            echo json_encode([
+                "success" => false,
+                "message" => "Approval status is required."
+            ]);
+
+            return;
+        }
+
+        $result = $this->tournamentService->updateApprovalStatus(
+            (int)$tournamentId,
+            strtoupper($request->approvalStatus)
+        );
+
         header("Content-Type: application/json");
 
         echo json_encode($result);
     }
 
+//    Filter by the Status
+    public function filterTournamentsByStatus()
+    {
+        header("Content-Type: application/json");
+
+        $status = $_GET["status"] ?? null;
+
+        if ($status === null) {
+            http_response_code(400);
+
+            echo json_encode([
+                "success" => false,
+                "message" => "Tournament status is required."
+            ]);
+
+            return;
+        }
+
+        $result = $this->tournamentService->filterTournamentsByStatus(strtoupper($status));
+
+        echo json_encode($result);
+    }
 
 }
 

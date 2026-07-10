@@ -14,7 +14,8 @@ class TournamentService{
      */
     public function createTournament(Tournament $tournament): array{
         // Default status: PENDING (requires admin approval)
-        $tournament->setStatus("PENDING");
+        $tournament->setApprovalStatus("PENDING");
+
 
         try{
             Database::beginTransaction();
@@ -60,6 +61,20 @@ class TournamentService{
         ];
     }
 
+    /**
+     * Retrieve approved tournaments, optionally filtered by search text.
+     */
+    public function getApprovedTournaments(string $search): array
+    {
+        $rows = $this->tournamentRepository->findApprovedTournaments($search);
+
+        return [
+            "success" => true,
+            "message" => "Approved tournaments retrieved successfully.",
+            "data" => $rows
+        ];
+    }
+
 //    Update the Status
     public function updateTournamentStatus(
         int $tournamentId,
@@ -67,8 +82,9 @@ class TournamentService{
     ): array
     {
         $allowedStatus = [
-            "APPROVED",
-            "REJECTED",
+            "UPCOMING",
+            "ONGOING",
+            "COMPLETED",
             "CANCELLED"
         ];
 
@@ -112,6 +128,101 @@ class TournamentService{
         return [
             "success" => true,
             "message" => "Tournament status updated successfully."
+        ];
+    }
+
+
+//    Update the Approval Status by the admin
+    public function updateApprovalStatus(
+        int $tournamentId,
+        string $approvalStatus
+    ): array
+    {
+        $allowedStatus = [
+            "APPROVED",
+            "REJECTED"
+        ];
+
+        if (!in_array($approvalStatus, $allowedStatus)) {
+
+            return [
+                "success" => false,
+                "message" => "Invalid approval status."
+            ];
+        }
+
+        $tournament = $this->tournamentRepository
+            ->findById($tournamentId);
+
+        if (!$tournament) {
+
+            return [
+                "success" => false,
+                "message" => "Tournament not found."
+            ];
+        }
+
+        if ($tournament["approval_status"] == $approvalStatus) {
+
+            return [
+                "success" => false,
+                "message" => "Tournament is already in this approval status."
+            ];
+        }
+
+        $updated = $this->tournamentRepository
+            ->updateApprovalStatus(
+                $tournamentId,
+                $approvalStatus
+            );
+
+        if (!$updated) {
+
+            return [
+                "success" => false,
+                "message" => "Failed to update approval status."
+            ];
+        }
+
+        return [
+            "success" => true,
+            "message" => "Tournament approval updated successfully."
+        ];
+    }
+
+
+//    Filtering by the Status
+    public function filterTournamentsByStatus(string $status): array
+    {
+        $allowedStatuses = [
+            "UPCOMING",
+            "ONGOING",
+            "COMPLETED",
+            "CANCELLED"
+        ];
+
+        if (!in_array($status, $allowedStatuses, true)) {
+            return [
+                "success" => false,
+                "message" => "Invalid tournament status."
+            ];
+        }
+
+        $tournaments = $this->tournamentRepository
+            ->filterByStatus($status);
+
+        if (empty($tournaments)) {
+            return [
+                "success" => true,
+                "message" => "No tournaments found for this status.",
+                "data" => []
+            ];
+        }
+
+        return [
+            "success" => true,
+            "message" => "Tournaments retrieved successfully.",
+            "data" => $tournaments
         ];
     }
 }
