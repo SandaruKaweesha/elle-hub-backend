@@ -24,7 +24,7 @@ class TournamentRepository{
             maximum_team_limit,
             rules,
             prize_details,
-            status,
+            approval_status,
             created_at
         ) VALUES (
             :organizer_id,
@@ -36,7 +36,7 @@ class TournamentRepository{
             :maximum_team_limit,
             :rules,
             :prize_details,
-            :status,
+            :approval_status,
             NOW()
         )";
 
@@ -51,7 +51,7 @@ class TournamentRepository{
         $statement->bindValue(":maximum_team_limit", $tournament->getMaximumTeamLimit(), PDO::PARAM_INT);
         $statement->bindValue(":rules", $tournament->getRules());
         $statement->bindValue(":prize_details", $tournament->getPrizeDetails());
-        $statement->bindValue(":status", $tournament->getStatus());
+        $statement->bindValue(":approval_status", $tournament->getApprovalStatus());
 
         $statement->execute();
 
@@ -62,16 +62,42 @@ class TournamentRepository{
      * Find tournaments by status.
      * Reusable for PENDING, APPROVED, REJECTED, etc.
      */
-    public function findByStatus(string $status): array
+    public function findByStatus(string $approval_status): array
     {
-        $sql = "SELECT * FROM tournaments WHERE status = :status";
+        $sql = "SELECT * FROM tournaments WHERE approval_status = :approval_status";
+
         $statement = $this->connection->prepare($sql);
-        $statement->bindValue(":status", $status);
+
+        $statement->bindValue(
+            ":approval_status",
+            $approval_status
+        );
+
         $statement->execute();
 
-        $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
+        return $statement->fetchAll(PDO::FETCH_ASSOC);
+    }
 
-        return $rows;
+    /**
+     * Find approved tournaments, optionally filtered by search text.
+     * Uses the existing `title` column from the current project codebase.
+     */
+    public function findApprovedTournaments(string $search): array
+    {
+        if ($search === "") {
+            $sql = "SELECT * FROM tournaments WHERE approval_status = 'APPROVED'";
+            $statement = $this->connection->prepare($sql);
+            $statement->execute();
+
+            return $statement->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        $sql = "SELECT * FROM tournaments WHERE approval_status = 'APPROVED' AND title LIKE :search";
+        $statement = $this->connection->prepare($sql);
+        $statement->bindValue(":search", "%" . $search . "%");
+        $statement->execute();
+
+        return $statement->fetchAll(PDO::FETCH_ASSOC);
     }
 
 //  Find By the ID
@@ -128,5 +154,56 @@ class TournamentRepository{
 
         return $statement->rowCount() > 0;
     }
+
+
+
+//    Update the Approval Status by the Admin
+    public function updateApprovalStatus(
+        int $tournamentId,
+        string $approvalStatus
+    ): bool
+    {
+        $sql = "
+        UPDATE tournaments
+        SET approval_status = :approval_status
+        WHERE tournament_id = :tournament_id
+    ";
+
+        $statement = $this->connection->prepare($sql);
+
+        $statement->bindValue(
+            ":approval_status",
+            $approvalStatus
+        );
+
+        $statement->bindValue(
+            ":tournament_id",
+            $tournamentId,
+            PDO::PARAM_INT
+        );
+
+        $statement->execute();
+
+        return $statement->rowCount() > 0;
+    }
+
+
+// Filtering tournaments by lifecycle status
+    public function filterByStatus(string $status): array
+    {
+        $sql = "SELECT * FROM tournaments WHERE status = :status";
+
+        $statement = $this->connection->prepare($sql);
+
+        $statement->bindValue(
+            ":status",
+            $status
+        );
+
+        $statement->execute();
+
+        return $statement->fetchAll(PDO::FETCH_ASSOC);
+    }
+
 }
 
