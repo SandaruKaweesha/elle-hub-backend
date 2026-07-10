@@ -225,5 +225,59 @@ class TournamentService{
             "data" => $tournaments
         ];
     }
+
+    public function getTournamentById(int $tournamentId): array
+    {
+        $tournament = $this->tournamentRepository
+            ->findById($tournamentId);
+
+        if ($tournament === null) {
+            return [
+                "success" => false,
+                "message" => "Tournament not found."
+            ];
+        }
+
+        return [
+            "success" => true,
+            "message" => "Tournament retrieved successfully.",
+            "data" => $tournament
+        ];
+    }
+
+
+// Update the tournament details
+    public function updateTournament(
+        int $tournamentId,
+        object $request
+    ): array
+    {
+        $tournament = $this->tournamentRepository
+            ->findById($tournamentId);
+
+        if ($tournament === null) {
+            return [
+                "success" => false,
+                "message" => "Tournament not found."
+            ];
+        }
+
+        $updated = $this->tournamentRepository->update(
+            $tournamentId,
+            $request
+        );
+
+        if (!$updated) {
+            return [
+                "success" => false,
+                "message" => "Tournament details were not updated."
+            ];
+        }
+
+        return [
+            "success" => true,
+            "message" => "Tournament updated successfully."
+        ];
+    }
 }
 

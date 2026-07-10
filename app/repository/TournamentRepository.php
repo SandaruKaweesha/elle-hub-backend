@@ -205,5 +205,75 @@ class TournamentRepository{
         return $statement->fetchAll(PDO::FETCH_ASSOC);
     }
 
+//    Update the tournament
+    public function update(
+        int $tournamentId,
+        object $request
+    ): bool
+    {
+        $sql = "UPDATE tournaments
+            SET title = :title,
+                description = :description,
+                location = :location,
+                start_date = :start_date,
+                end_date = :end_date,
+                maximum_team_limit = :maximum_team_limit,
+                rules = :rules,
+                prize_details = :prize_details
+            WHERE tournament_id = :tournament_id";
+
+        $statement = $this->connection->prepare($sql);
+
+        $statement->bindValue(
+            ":title",
+            $request->title
+        );
+
+        $statement->bindValue(
+            ":description",
+            $request->description
+        );
+
+        $statement->bindValue(
+            ":location",
+            $request->location
+        );
+
+        $statement->bindValue(
+            ":start_date",
+            $request->startDate
+        );
+
+        $statement->bindValue(
+            ":end_date",
+            $request->endDate
+        );
+
+        $statement->bindValue(
+            ":maximum_team_limit",
+            $request->maximumTeamLimit,
+            PDO::PARAM_INT
+        );
+
+        $statement->bindValue(
+            ":rules",
+            $request->rules
+        );
+
+        $statement->bindValue(
+            ":prize_details",
+            $request->prizeDetails
+        );
+
+        $statement->bindValue(
+            ":tournament_id",
+            $tournamentId,
+            PDO::PARAM_INT
+        );
+
+        $statement->execute();
+
+        return $statement->rowCount() > 0;
+    }
 }
 
