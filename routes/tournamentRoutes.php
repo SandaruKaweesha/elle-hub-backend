@@ -42,3 +42,7 @@ $router->put(
     "/organizer/tournament/{id}",
     [TournamentController::class, "updateTournament"]
 );
+$router->get(
+    "/organizer/{id}/tournaments",
+    [TournamentController::class, "getOrganizerTournaments"]
+);

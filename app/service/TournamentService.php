@@ -135,16 +135,16 @@ class TournamentService{
 //    Update the Approval Status by the admin
     public function updateApprovalStatus(
         int $tournamentId,
-        string $approvalStatus
+        string $approvalStatus,
+        int $adminId
     ): array
     {
-        $allowedStatus = [
-            "APPROVED",
+        $allowedStatuses = [
+            "git ",
             "REJECTED"
         ];
 
-        if (!in_array($approvalStatus, $allowedStatus)) {
-
+        if (!in_array($approvalStatus, $allowedStatuses, true)) {
             return [
                 "success" => false,
                 "message" => "Invalid approval status."
@@ -154,39 +154,37 @@ class TournamentService{
         $tournament = $this->tournamentRepository
             ->findById($tournamentId);
 
-        if (!$tournament) {
-
+        if ($tournament === null) {
             return [
                 "success" => false,
                 "message" => "Tournament not found."
             ];
         }
 
-        if ($tournament["approval_status"] == $approvalStatus) {
-
+        if ($tournament["approval_status"] !== "PENDING") {
             return [
                 "success" => false,
-                "message" => "Tournament is already in this approval status."
+                "message" => "Only pending tournaments can be approved or rejected."
             ];
         }
 
         $updated = $this->tournamentRepository
             ->updateApprovalStatus(
                 $tournamentId,
-                $approvalStatus
+                $approvalStatus,
+                $adminId
             );
 
         if (!$updated) {
-
             return [
                 "success" => false,
-                "message" => "Failed to update approval status."
+                "message" => "Failed to update tournament approval status."
             ];
         }
 
         return [
             "success" => true,
-            "message" => "Tournament approval updated successfully."
+            "message" => "Tournament approval status updated successfully."
         ];
     }
 
@@ -277,6 +275,27 @@ class TournamentService{
         return [
             "success" => true,
             "message" => "Tournament updated successfully."
+        ];
+    }
+
+//   Get all tournaments for a specific organizer
+    public function getOrganizerTournaments(int $organizerId): array
+    {
+        $tournaments = $this->tournamentRepository
+            ->findByOrganizerId($organizerId);
+
+        if (empty($tournaments)) {
+            return [
+                "success" => true,
+                "message" => "No tournaments found for this organizer.",
+                "data" => []
+            ];
+        }
+
+        return [
+            "success" => true,
+            "message" => "Organizer tournaments retrieved successfully.",
+            "data" => $tournaments
         ];
     }
 }
