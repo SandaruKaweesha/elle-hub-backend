@@ -92,26 +92,30 @@ class TournamentController{
 //    Update the Approval Status By the Admin
     public function updateApprovalStatus($tournamentId)
     {
+        header("Content-Type: application/json");
+
         $requestBody = file_get_contents("php://input");
+        $requestObject = json_decode($requestBody);
 
-        $request = json_decode($requestBody);
-
-        if (!isset($request->approvalStatus)) {
+        if (
+            !isset($requestObject->approvalStatus) ||
+            !isset($requestObject->adminId)
+        ) {
+            http_response_code(400);
 
             echo json_encode([
                 "success" => false,
-                "message" => "Approval status is required."
+                "message" => "Approval status and Admin ID are required."
             ]);
 
             return;
         }
 
         $result = $this->tournamentService->updateApprovalStatus(
-            (int)$tournamentId,
-            strtoupper($request->approvalStatus)
+            (int) $tournamentId,
+            strtoupper($requestObject->approvalStatus),
+            (int) $requestObject->adminId
         );
-
-        header("Content-Type: application/json");
 
         echo json_encode($result);
     }
@@ -135,6 +139,54 @@ class TournamentController{
         }
 
         $result = $this->tournamentService->filterTournamentsByStatus(strtoupper($status));
+
+        echo json_encode($result);
+    }
+
+//    Get Tournament by ID (aslo Searching we can do)
+    public function getTournamentById($tournamentId)
+    {
+        header("Content-Type: application/json");
+
+        $result = $this->tournamentService->getTournamentById((int) $tournamentId);
+
+        echo json_encode($result);
+    }
+
+//    Update the tournament Details
+    public function updateTournament($tournamentId)
+    {
+        header("Content-Type: application/json");
+
+        $requestBody = file_get_contents("php://input");
+        $requestObject = json_decode($requestBody);
+
+        if ($requestObject === null) {
+            http_response_code(400);
+
+            echo json_encode([
+                "success" => false,
+                "message" => "Invalid JSON request body."
+            ]);
+
+            return;
+        }
+
+        $result = $this->tournamentService->updateTournament(
+            (int) $tournamentId,
+            $requestObject
+        );
+
+        echo json_encode($result);
+    }
+
+//    Organizer's own tournaments
+    public function getOrganizerTournaments($organizerId)
+    {
+        header("Content-Type: application/json");
+
+        $result = $this->tournamentService
+            ->getOrganizerTournaments((int) $organizerId);
 
         echo json_encode($result);
     }

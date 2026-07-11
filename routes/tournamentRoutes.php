@@ -30,3 +30,19 @@ $router->get(
     "/tournaments/filter",
     [TournamentController::class, "filterTournamentsByStatus"]
 );
+
+//Get tournament by the ID
+$router->get(
+    "/tournaments/{id}",
+    [TournamentController::class, "getTournamentById"]
+);
+
+//Update tournament by the ID
+$router->put(
+    "/organizer/tournament/{id}",
+    [TournamentController::class, "updateTournament"]
+);
+$router->get(
+    "/organizer/{id}/tournaments",
+    [TournamentController::class, "getOrganizerTournaments"]
+);
