@@ -160,20 +160,27 @@ class TournamentRepository{
 //    Update the Approval Status by the Admin
     public function updateApprovalStatus(
         int $tournamentId,
-        string $approvalStatus
+        string $approvalStatus,
+        int $adminId
     ): bool
     {
-        $sql = "
-        UPDATE tournaments
-        SET approval_status = :approval_status
-        WHERE tournament_id = :tournament_id
-    ";
+        $sql = "UPDATE tournaments
+            SET approval_status = :approval_status,
+                approved_by = :approved_by,
+                approved_date = NOW()
+            WHERE tournament_id = :tournament_id";
 
         $statement = $this->connection->prepare($sql);
 
         $statement->bindValue(
             ":approval_status",
             $approvalStatus
+        );
+
+        $statement->bindValue(
+            ":approved_by",
+            $adminId,
+            PDO::PARAM_INT
         );
 
         $statement->bindValue(
@@ -186,7 +193,6 @@ class TournamentRepository{
 
         return $statement->rowCount() > 0;
     }
-
 
 // Filtering tournaments by lifecycle status
     public function filterByStatus(string $status): array
@@ -205,5 +211,96 @@ class TournamentRepository{
         return $statement->fetchAll(PDO::FETCH_ASSOC);
     }
 
+//    Update the tournament
+    public function update(
+        int $tournamentId,
+        object $request
+    ): bool
+    {
+        $sql = "UPDATE tournaments
+            SET title = :title,
+                description = :description,
+                location = :location,
+                start_date = :start_date,
+                end_date = :end_date,
+                maximum_team_limit = :maximum_team_limit,
+                rules = :rules,
+                prize_details = :prize_details
+            WHERE tournament_id = :tournament_id";
+
+        $statement = $this->connection->prepare($sql);
+
+        $statement->bindValue(
+            ":title",
+            $request->title
+        );
+
+        $statement->bindValue(
+            ":description",
+            $request->description
+        );
+
+        $statement->bindValue(
+            ":location",
+            $request->location
+        );
+
+        $statement->bindValue(
+            ":start_date",
+            $request->startDate
+        );
+
+        $statement->bindValue(
+            ":end_date",
+            $request->endDate
+        );
+
+        $statement->bindValue(
+            ":maximum_team_limit",
+            $request->maximumTeamLimit,
+            PDO::PARAM_INT
+        );
+
+        $statement->bindValue(
+            ":rules",
+            $request->rules
+        );
+
+        $statement->bindValue(
+            ":prize_details",
+            $request->prizeDetails
+        );
+
+        $statement->bindValue(
+            ":tournament_id",
+            $tournamentId,
+            PDO::PARAM_INT
+        );
+
+        $statement->execute();
+
+        return $statement->rowCount() > 0;
+    }
+
+//    Find tournaments by organizer ID, ordered by creation date descending
+    public function findByOrganizerId(int $organizerId): array
+    {
+        $sql = "SELECT *
+            FROM tournaments
+            WHERE organizer_id = :organizer_id
+            ORDER BY created_at DESC";
+
+        $statement = $this->connection->prepare($sql);
+
+        $statement->bindValue(
+            ":organizer_id",
+            $organizerId,
+            PDO::PARAM_INT
+        );
+
+        $statement->execute();
+
+        return $statement->fetchAll(PDO::FETCH_ASSOC);
+    }
 }
 
