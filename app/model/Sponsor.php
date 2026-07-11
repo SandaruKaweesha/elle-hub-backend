@@ -1,14 +1,14 @@
 <?php
 
+
 require_once "User.php";
 
-class Playground extends User
+class Sponsor extends User
 {
-    private $playgroundName;
-    private $location;
+    private $companyName;
+    private $contactPerson;
     private $address;
     private $contactNumber;
-    private $capacity;
 
     // Constructor
     public function __construct(
@@ -22,13 +22,13 @@ class Playground extends User
         $approvedDate = null,
         $lastLogin = null,
         $createdAt = null,
-        $playgroundName = null,
-        $location = null,
-        $address = null,
-        $contactNumber = null,
-        $capacity = null
-    ) {
 
+        $companyName = null,
+        $contactPerson = null,
+        $address = null,
+        $contactNumber = null
+    )
+    {
         parent::__construct(
             $userId,
             $email,
@@ -42,23 +42,22 @@ class Playground extends User
             $createdAt
         );
 
-        $this->playgroundName = $playgroundName;
-        $this->location = $location;
+        $this->companyName = $companyName;
+        $this->contactPerson = $contactPerson;
         $this->address = $address;
         $this->contactNumber = $contactNumber;
-        $this->capacity = $capacity;
     }
 
     // Getters
 
-    public function getPlaygroundName()
+    public function getCompanyName()
     {
-        return $this->playgroundName;
+        return $this->companyName;
     }
 
-    public function getLocation()
+    public function getContactPerson()
     {
-        return $this->location;
+        return $this->contactPerson;
     }
 
     public function getAddress()
@@ -71,21 +70,16 @@ class Playground extends User
         return $this->contactNumber;
     }
 
-    public function getCapacity()
-    {
-        return $this->capacity;
-    }
-
     // Setters
 
-    public function setPlaygroundName($playgroundName)
+    public function setCompanyName($companyName)
     {
-        $this->playgroundName = $playgroundName;
+        $this->companyName = $companyName;
     }
 
-    public function setLocation($location)
+    public function setContactPerson($contactPerson)
     {
-        $this->location = $location;
+        $this->contactPerson = $contactPerson;
     }
 
     public function setAddress($address)
@@ -96,10 +90,5 @@ class Playground extends User
     public function setContactNumber($contactNumber)
     {
         $this->contactNumber = $contactNumber;
-    }
-
-    public function setCapacity($capacity)
-    {
-        $this->capacity = $capacity;
     }
 }

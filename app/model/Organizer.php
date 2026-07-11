@@ -1,11 +1,11 @@
 <?php
 
+
 require_once "User.php";
 
-class Sponsor extends User
+class Organizer extends User
 {
-    private $companyName;
-    private $contactPerson;
+    private $organizationName;
     private $address;
     private $contactNumber;
 
@@ -22,11 +22,11 @@ class Sponsor extends User
         $lastLogin = null,
         $createdAt = null,
 
-        $companyName = null,
-        $contactPerson = null,
+        $organizationName = null,
         $address = null,
         $contactNumber = null
-    ) {
+    )
+    {
         parent::__construct(
             $userId,
             $email,
@@ -40,22 +40,16 @@ class Sponsor extends User
             $createdAt
         );
 
-        $this->companyName = $companyName;
-        $this->contactPerson = $contactPerson;
+        $this->organizationName = $organizationName;
         $this->address = $address;
         $this->contactNumber = $contactNumber;
     }
 
     // Getters
 
-    public function getCompanyName()
+    public function getOrganizationName()
     {
-        return $this->companyName;
-    }
-
-    public function getContactPerson()
-    {
-        return $this->contactPerson;
+        return $this->organizationName;
     }
 
     public function getAddress()
@@ -70,14 +64,9 @@ class Sponsor extends User
 
     // Setters
 
-    public function setCompanyName($companyName)
+    public function setOrganizationName($organizationName)
     {
-        $this->companyName = $companyName;
-    }
-
-    public function setContactPerson($contactPerson)
-    {
-        $this->contactPerson = $contactPerson;
+        $this->organizationName = $organizationName;
     }
 
     public function setAddress($address)

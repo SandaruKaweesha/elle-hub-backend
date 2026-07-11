@@ -1,12 +1,15 @@
 <?php
 
+
 require_once "User.php";
 
-class Organizer extends User
+class Playground extends User
 {
-    private $organizationName;
+    private $playgroundName;
+    private $location;
     private $address;
     private $contactNumber;
+    private $capacity;
 
     // Constructor
     public function __construct(
@@ -20,11 +23,14 @@ class Organizer extends User
         $approvedDate = null,
         $lastLogin = null,
         $createdAt = null,
-
-        $organizationName = null,
+        $playgroundName = null,
+        $location = null,
         $address = null,
-        $contactNumber = null
-    ) {
+        $contactNumber = null,
+        $capacity = null
+    )
+    {
+
         parent::__construct(
             $userId,
             $email,
@@ -38,16 +44,23 @@ class Organizer extends User
             $createdAt
         );
 
-        $this->organizationName = $organizationName;
+        $this->playgroundName = $playgroundName;
+        $this->location = $location;
         $this->address = $address;
         $this->contactNumber = $contactNumber;
+        $this->capacity = $capacity;
     }
 
     // Getters
 
-    public function getOrganizationName()
+    public function getPlaygroundName()
     {
-        return $this->organizationName;
+        return $this->playgroundName;
+    }
+
+    public function getLocation()
+    {
+        return $this->location;
     }
 
     public function getAddress()
@@ -60,11 +73,21 @@ class Organizer extends User
         return $this->contactNumber;
     }
 
+    public function getCapacity()
+    {
+        return $this->capacity;
+    }
+
     // Setters
 
-    public function setOrganizationName($organizationName)
+    public function setPlaygroundName($playgroundName)
     {
-        $this->organizationName = $organizationName;
+        $this->playgroundName = $playgroundName;
+    }
+
+    public function setLocation($location)
+    {
+        $this->location = $location;
     }
 
     public function setAddress($address)
@@ -75,5 +98,10 @@ class Organizer extends User
     public function setContactNumber($contactNumber)
     {
         $this->contactNumber = $contactNumber;
+    }
+
+    public function setCapacity($capacity)
+    {
+        $this->capacity = $capacity;
     }
 }

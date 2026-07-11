@@ -2,10 +2,10 @@
 
 require_once "User.php";
 
-class Referee extends User
+class Team extends User
 {
-    private $fullName;
-    private $experienceYears;
+    private $teamName;
+    private $district;
     private $contactNumber;
     private $rating;
 
@@ -22,11 +22,12 @@ class Referee extends User
         $lastLogin = null,
         $createdAt = null,
 
-        $fullName = null,
-        $experienceYears = null,
+        $teamName = null,
+        $district = null,
         $contactNumber = null,
         $rating = null
-    ) {
+    )
+    {
         parent::__construct(
             $userId,
             $email,
@@ -40,22 +41,22 @@ class Referee extends User
             $createdAt
         );
 
-        $this->fullName = $fullName;
-        $this->experienceYears = $experienceYears;
+        $this->teamName = $teamName;
+        $this->district = $district;
         $this->contactNumber = $contactNumber;
         $this->rating = $rating;
     }
 
     // Getters
 
-    public function getFullName()
+    public function getTeamName()
     {
-        return $this->fullName;
+        return $this->teamName;
     }
 
-    public function getExperienceYears()
+    public function getDistrict()
     {
-        return $this->experienceYears;
+        return $this->district;
     }
 
     public function getContactNumber()
@@ -70,14 +71,14 @@ class Referee extends User
 
     // Setters
 
-    public function setFullName($fullName)
+    public function setTeamName($teamName)
     {
-        $this->fullName = $fullName;
+        $this->teamName = $teamName;
     }
 
-    public function setExperienceYears($experienceYears)
+    public function setDistrict($district)
     {
-        $this->experienceYears = $experienceYears;
+        $this->district = $district;
     }
 
     public function setContactNumber($contactNumber)

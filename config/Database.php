@@ -1,0 +1,56 @@
+<?php
+class Database
+{
+    private static ?PDO $connection = null;
+
+    public static function getConnection(): PDO
+    {
+        if (self::$connection === null) {
+
+            $host = "ellehub-mysql.mysql.database.azure.com";
+            $database = "elle_hub";
+            $username = "ellehubadmin";
+            $password = "admin@4444";
+
+            $dsn = "mysql:host=$host;port=3306;dbname=$database;charset=utf8mb4";
+
+            $options = [
+                PDO::MYSQL_ATTR_SSL_CA => __DIR__ . "/../certs/DigiCertGlobalRootG2.crt.pem",
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_EMULATE_PREPARES => false
+            ];
+
+            try {
+
+                self::$connection = new PDO(
+                    $dsn,
+                    $username,
+                    $password,
+                    $options
+                );
+
+            } catch (PDOException $e) {
+
+                die("Database Connection Failed : " . $e->getMessage());
+
+            }
+        }
+
+        return self::$connection;
+    }
+    public static function beginTransaction()
+    {
+        self::getConnection()->beginTransaction();
+    }
+
+    public static function commit()
+    {
+        self::getConnection()->commit();
+    }
+
+    public static function rollback()
+    {
+        self::getConnection()->rollBack();
+    }
+}
