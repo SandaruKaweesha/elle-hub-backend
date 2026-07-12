@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . "/../model/User.php";
+require_once __DIR__ . "/../model/Admin.php";
 require_once __DIR__ . "/../model/Team.php";
 require_once __DIR__ . "/../model/Sponsor.php";
 
@@ -18,6 +19,11 @@ class UserController{
         $requestObject = json_decode($requestBody);
 
         switch ($requestObject->role){
+            case "ADMIN":
+                $user = new Admin();
+                $user->setFullName($requestObject->fullName);
+                break;
+
             case "TEAM":
                 $user = new Team();
 //              this going ot the team
