@@ -141,4 +141,31 @@ class UserRepository{
 
         return $statement->rowCount() > 0;
     }
+
+    public function getCountsByRole(): array
+    {
+        $sql = "SELECT role, COUNT(*) as count FROM users GROUP BY role";
+        $statement = $this->connection->prepare($sql);
+        $statement->execute();
+        $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
+
+        $counts = [
+            'TOTAL' => 0,
+            'TEAM' => 0,
+            'REFEREE' => 0,
+            'SPONSOR' => 0,
+            'PLAYGROUND' => 0,
+            'ORGANIZER' => 0,
+            'ADMIN' => 0
+        ];
+
+        foreach ($rows as $row) {
+            $role = strtoupper($row['role']);
+            $count = (int)$row['count'];
+            $counts[$role] = $count;
+            $counts['TOTAL'] += $count;
+        }
+
+        return $counts;
+    }
 }

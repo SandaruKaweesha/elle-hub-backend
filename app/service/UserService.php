@@ -147,4 +147,15 @@ class UserService{
             "message" => "User deleted successfully."
         ];
     }
+
+    public function getUserStats(): array
+    {
+        $counts = $this->userRepository->getCountsByRole();
+        
+        return [
+            "success" => true,
+            "message" => "User stats retrieved successfully.",
+            "data" => $counts
+        ];
+    }
 }
