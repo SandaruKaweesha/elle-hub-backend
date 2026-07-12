@@ -118,4 +118,12 @@ class UserController{
 
         echo json_encode($result);
     }
+
+    public function getStats()
+    {
+        $result = $this->userService->getUserStats();
+        header("Content-Type: application/json");
+        http_response_code(200);
+        echo json_encode($result);
+    }
 }

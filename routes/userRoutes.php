@@ -15,6 +15,12 @@ $router->get(
     [UserController::class, "getAllUsers"]
 );
 
+// GET http://localhost/elle-hub-backend/user/stats
+$router->get(
+    "/user/stats",
+    [UserController::class, "getStats"]
+);
+
 // GET http://localhost/elle-hub-backend/user/search
 $router->get(
     "/user/search",
