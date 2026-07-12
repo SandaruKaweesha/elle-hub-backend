@@ -73,18 +73,7 @@ class UserRepository{
 
     public function findById(int $userId): ?array
     {
-        $sql = "SELECT
-                user_id,
-                email,
-                role,
-                status,
-                profile_picture,
-                approved_by,
-                approved_date,
-                last_login,
-                created_at
-            FROM users
-            WHERE user_id = :user_id";
+        $sql = "SELECT * FROM users WHERE user_id = :user_id";
 
         $statement = $this->connection->prepare($sql);
         $statement->bindValue(
@@ -99,6 +88,36 @@ class UserRepository{
 
         if (!$user) {
             return null;
+        }
+
+        // Fetch role specific data
+        $role = $user['role'] ?? null;
+        if ($role) {
+            $tableName = null;
+            if ($role === 'ORGANIZER') $tableName = 'organizers';
+            else if ($role === 'REFEREE') $tableName = 'referees';
+            else if ($role === 'TEAM') $tableName = 'teams';
+            else if ($role === 'SPONSOR') $tableName = 'sponsors';
+            else if ($role === 'PLAYGROUND') $tableName = 'playgrounds';
+
+            if ($tableName) {
+                $roleSql = "SELECT * FROM {$tableName} WHERE user_id = :user_id";
+                $roleStatement = $this->connection->prepare($roleSql);
+                $roleStatement->bindValue(":user_id", $userId, PDO::PARAM_INT);
+                $roleStatement->execute();
+                $roleData = $roleStatement->fetch(PDO::FETCH_ASSOC);
+                
+                if ($roleData) {
+                    $user = array_merge($user, $roleData);
+                    
+                    // Map snake_case to camelCase for frontend compatibility
+                    if (isset($roleData['organization_name'])) $user['organizationName'] = $roleData['organization_name'];
+                    if (isset($roleData['full_name'])) $user['fullName'] = $roleData['full_name'];
+                    if (isset($roleData['company_name'])) $user['companyName'] = $roleData['company_name'];
+                    if (isset($roleData['team_name'])) $user['teamName'] = $roleData['team_name'];
+                    if (isset($roleData['playground_name'])) $user['playgroundName'] = $roleData['playground_name'];
+                }
+            }
         }
 
         return $user;
