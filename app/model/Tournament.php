@@ -9,6 +9,7 @@ class Tournament
     private $location;
     private $startDate;
     private $endDate;
+    private $tournamentHeldDate;
     private $maximumTeamLimit;
     private $rules;
     private $prizeDetails;
@@ -27,6 +28,7 @@ class Tournament
         $location = null,
         $startDate = null,
         $endDate = null,
+        $tournamentHeldDate = null,
         $maximumTeamLimit = null,
         $rules = null,
         $prizeDetails = null,
@@ -45,6 +47,7 @@ class Tournament
         $this->location = $location;
         $this->startDate = $startDate;
         $this->endDate = $endDate;
+        $this->tournamentHeldDate = $tournamentHeldDate;
         $this->maximumTeamLimit = $maximumTeamLimit;
         $this->rules = $rules;
         $this->prizeDetails = $prizeDetails;
@@ -207,5 +210,15 @@ class Tournament
     public function setCreatedAt($createdAt)
     {
         $this->createdAt = $createdAt;
+    }
+
+    public function getTournamentHeldDate()
+    {
+        return $this->tournamentHeldDate;
+    }
+
+    public function setTournamentHeldDate($tournamentHeldDate)
+    {
+        $this->tournamentHeldDate = $tournamentHeldDate;
     }
 }

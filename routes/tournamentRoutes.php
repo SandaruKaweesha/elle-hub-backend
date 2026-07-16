@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . "/../app/controller/TournamentController.php";
+require_once __DIR__ . "/../app/controller/TournamentTeamRequestController.php";
 
 $router->post(
     "/organizer/tournament/create",
@@ -45,4 +46,25 @@ $router->put(
 $router->get(
     "/organizer/{id}/tournaments",
     [TournamentController::class, "getOrganizerTournaments"]
+);
+
+// Tournament Join Participation Requests
+$router->post(
+    "/tournament/request",
+    [TournamentTeamRequestController::class, "submitRequest"]
+);
+
+$router->get(
+    "/team/{id}/requests",
+    [TournamentTeamRequestController::class, "getTeamRequests"]
+);
+
+$router->post(
+    "/tournament/request/cancel",
+    [TournamentTeamRequestController::class, "cancelRequest"]
+);
+
+$router->post(
+    "/tournament/request/leave",
+    [TournamentTeamRequestController::class, "leaveTournament"]
 );

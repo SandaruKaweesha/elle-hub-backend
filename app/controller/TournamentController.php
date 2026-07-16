@@ -24,6 +24,7 @@ class TournamentController{
         $tournament->setLocation($requestObject->location ?? null);
         $tournament->setStartDate($requestObject->startDate ?? null);
         $tournament->setEndDate($requestObject->endDate ?? null);
+        $tournament->setTournamentHeldDate($requestObject->tournamentHeldDate ?? null);
         $tournament->setMaximumTeamLimit($requestObject->maximumTeamLimit ?? null);
         $tournament->setRules($requestObject->rules ?? null);
         $tournament->setPrizeDetails($requestObject->prizeDetails ?? null);
