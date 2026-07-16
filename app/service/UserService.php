@@ -158,4 +158,35 @@ class UserService{
             "data" => $counts
         ];
     }
+
+    public function updateProfile(int $userId, string $role, array $data): array
+    {
+        $updated = $this->userRepository->updateProfile($userId, $role, $data);
+        if ($updated) {
+            return [
+                "success" => true,
+                "message" => "Profile updated successfully."
+            ];
+        }
+        return [
+            "success" => false,
+            "message" => "Failed to update profile details."
+        ];
+    }
+
+    public function updatePassword(int $userId, string $password): array
+    {
+        $hashed = password_hash($password, PASSWORD_DEFAULT);
+        $updated = $this->userRepository->updatePassword($userId, $hashed);
+        if ($updated) {
+            return [
+                "success" => true,
+                "message" => "Password updated successfully."
+            ];
+        }
+        return [
+            "success" => false,
+            "message" => "Failed to update password."
+        ];
+    }
 }
