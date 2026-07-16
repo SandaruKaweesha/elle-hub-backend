@@ -140,7 +140,7 @@ class TournamentService{
     ): array
     {
         $allowedStatuses = [
-            "git ",
+            "APPROVED",
             "REJECTED"
         ];
 
@@ -297,6 +297,22 @@ class TournamentService{
             "message" => "Organizer tournaments retrieved successfully.",
             "data" => $tournaments
         ];
+    }
+
+    public function getAllTournaments(): array
+    {
+        try {
+            $data = $this->tournamentRepository->findAll();
+            return [
+                "success" => true,
+                "data" => $data
+            ];
+        } catch (Exception $e) {
+            return [
+                "success" => false,
+                "message" => "Database error: " . $e->getMessage()
+            ];
+        }
     }
 }
 

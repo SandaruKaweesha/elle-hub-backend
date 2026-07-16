@@ -82,4 +82,22 @@ class TournamentTeamRequestRepository
 
         return $statement->execute();
     }
+
+    public function findByOrganizerId(int $organizerId): array
+    {
+        $sql = "SELECT r.tournament_id, r.team_user_id, r.request_date, r.status,
+                       t.title AS tournament_title,
+                       tm.team_name, tm.contact_number, tm.rating, tm.district
+                FROM tournament_team_requests r
+                JOIN tournaments t ON r.tournament_id = t.tournament_id
+                JOIN teams tm ON r.team_user_id = tm.user_id
+                WHERE t.organizer_id = :organizer_id
+                ORDER BY r.request_date DESC";
+
+        $statement = $this->connection->prepare($sql);
+        $statement->bindValue(":organizer_id", $organizerId, PDO::PARAM_INT);
+        $statement->execute();
+
+        return $statement->fetchAll(PDO::FETCH_ASSOC);
+    }
 }

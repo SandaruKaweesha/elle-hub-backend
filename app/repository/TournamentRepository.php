@@ -169,6 +169,7 @@ class TournamentRepository{
     {
         $sql = "UPDATE tournaments
             SET approval_status = :approval_status,
+                status = 'UPCOMING',
                 approved_by = :approved_by,
                 approved_date = NOW(),
                 start_date = NOW()
@@ -308,6 +309,19 @@ class TournamentRepository{
             PDO::PARAM_INT
         );
 
+        $statement->execute();
+
+        return $statement->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function findAll(): array
+    {
+        $sql = "SELECT t.*, o.organization_name AS organizer_name
+                FROM tournaments t
+                LEFT JOIN organizers o ON t.organizer_id = o.user_id
+                ORDER BY t.created_at DESC";
+
+        $statement = $this->connection->prepare($sql);
         $statement->execute();
 
         return $statement->fetchAll(PDO::FETCH_ASSOC);
