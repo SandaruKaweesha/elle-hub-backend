@@ -21,6 +21,7 @@ class TournamentRepository{
             location,
             start_date,
             end_date,
+            tournament_held_date,
             maximum_team_limit,
             rules,
             prize_details,
@@ -33,6 +34,7 @@ class TournamentRepository{
             :location,
             :start_date,
             :end_date,
+            :tournament_held_date,
             :maximum_team_limit,
             :rules,
             :prize_details,
@@ -48,6 +50,7 @@ class TournamentRepository{
         $statement->bindValue(":location", $tournament->getLocation());
         $statement->bindValue(":start_date", $tournament->getStartDate());
         $statement->bindValue(":end_date", $tournament->getEndDate());
+        $statement->bindValue(":tournament_held_date", $tournament->getTournamentHeldDate());
         $statement->bindValue(":maximum_team_limit", $tournament->getMaximumTeamLimit(), PDO::PARAM_INT);
         $statement->bindValue(":rules", $tournament->getRules());
         $statement->bindValue(":prize_details", $tournament->getPrizeDetails());
@@ -167,7 +170,8 @@ class TournamentRepository{
         $sql = "UPDATE tournaments
             SET approval_status = :approval_status,
                 approved_by = :approved_by,
-                approved_date = NOW()
+                approved_date = NOW(),
+                start_date = NOW()
             WHERE tournament_id = :tournament_id";
 
         $statement = $this->connection->prepare($sql);
@@ -223,6 +227,7 @@ class TournamentRepository{
                 location = :location,
                 start_date = :start_date,
                 end_date = :end_date,
+                tournament_held_date = :tournament_held_date,
                 maximum_team_limit = :maximum_team_limit,
                 rules = :rules,
                 prize_details = :prize_details
@@ -253,6 +258,11 @@ class TournamentRepository{
         $statement->bindValue(
             ":end_date",
             $request->endDate
+        );
+
+        $statement->bindValue(
+            ":tournament_held_date",
+            $request->tournamentHeldDate ?? null
         );
 
         $statement->bindValue(
