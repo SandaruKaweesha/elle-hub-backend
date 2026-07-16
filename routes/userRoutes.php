@@ -39,6 +39,12 @@ $router->put(
     [UserController::class, "updateUser"]
 );
 
+// PUT http://localhost/elle-hub-backend/user/updatePassword
+$router->put(
+    "/user/updatePassword",
+    [UserController::class, "updatePassword"]
+);
+
 
 // DELETE http://localhost/elle-hub-backend/user/delete/5
 $router->delete(

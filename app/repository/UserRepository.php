@@ -117,6 +117,15 @@ class UserRepository{
                     if (isset($roleData['team_name'])) $user['teamName'] = $roleData['team_name'];
                     if (isset($roleData['playground_name'])) $user['playgroundName'] = $roleData['playground_name'];
                 }
+
+                if ($role === 'TEAM') {
+                    $playerSql = "SELECT * FROM players WHERE team_user_id = :user_id";
+                    $playerStatement = $this->connection->prepare($playerSql);
+                    $playerStatement->bindValue(":user_id", $userId, PDO::PARAM_INT);
+                    $playerStatement->execute();
+                    $players = $playerStatement->fetchAll(PDO::FETCH_ASSOC);
+                    $user['players'] = $players;
+                }
             }
         }
 
@@ -167,5 +176,43 @@ class UserRepository{
         }
 
         return $counts;
+    }
+
+    public function updateProfile(int $userId, string $role, array $data): bool
+    {
+        try {
+            if ($role === 'TEAM') {
+                $sql = "UPDATE teams 
+                        SET team_name = :team_name, 
+                            address = :address, 
+                            district = :district,
+                            contact_number = :contact_number,
+                            description = :description
+                        WHERE user_id = :user_id";
+                $statement = $this->connection->prepare($sql);
+                $statement->bindValue(':team_name', $data['teamName'] ?? null);
+                $statement->bindValue(':address', $data['address'] ?? null);
+                $statement->bindValue(':district', $data['district'] ?? null);
+                $statement->bindValue(':contact_number', $data['contactNumber'] ?? $data['contact_number'] ?? null);
+                $statement->bindValue(':description', $data['description'] ?? null);
+                $statement->bindValue(':user_id', $userId, PDO::PARAM_INT);
+                $statement->execute();
+                return true;
+            }
+            return false;
+        } catch (Exception $e) {
+            error_log("Error in updateProfile: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function updatePassword(int $userId, string $hashedPassword): bool
+    {
+        $sql = "UPDATE users SET password = :password WHERE user_id = :user_id";
+        $statement = $this->connection->prepare($sql);
+        $statement->bindValue(':password', $hashedPassword);
+        $statement->bindValue(':user_id', $userId, PDO::PARAM_INT);
+        $statement->execute();
+        return $statement->rowCount() > 0;
     }
 }
