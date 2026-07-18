@@ -251,4 +251,14 @@ class UserRepository{
         $statement->execute();
         return $statement->rowCount() > 0;
     }
+
+    public function updateStatus(int $userId, string $status): bool
+    {
+        $sql = "UPDATE users SET status = :status WHERE user_id = :user_id";
+        $statement = $this->connection->prepare($sql);
+        $statement->bindValue(':status', $status);
+        $statement->bindValue(':user_id', $userId, PDO::PARAM_INT);
+        $statement->execute();
+        return $statement->rowCount() > 0;
+    }
 }

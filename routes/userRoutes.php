@@ -51,3 +51,15 @@ $router->delete(
     "/user/delete/{id}",
     [UserController::class, "deleteUser"]
 );
+
+// POST http://localhost/elle-hub-backend/user/approve/5
+$router->post(
+    "/user/approve/{id}",
+    [UserController::class, "approveUser"]
+);
+
+// POST http://localhost/elle-hub-backend/user/request-deletion
+$router->post(
+    "/user/request-deletion",
+    [UserController::class, "requestDeletion"]
+);

@@ -94,9 +94,9 @@ class TournamentTeamRequestService
             ];
         }
 
-        // Check if tournament is finalized (status is not UPCOMING)
-        $tournamentStatus = strtoupper($existing['tournament_status'] ?? 'UPCOMING');
-        if ($tournamentStatus !== 'UPCOMING') {
+        // Check if tournament is finalized (status is not ACTIVE)
+        $tournamentStatus = strtoupper($existing['tournament_status'] ?? 'ACTIVE');
+        if ($tournamentStatus !== 'ACTIVE') {
             return [
                 "success" => false,
                 "message" => "Cannot leave: The tournament setup has been finalized by the organizer."

@@ -169,7 +169,7 @@ class TournamentRepository{
     {
         $sql = "UPDATE tournaments
             SET approval_status = :approval_status,
-                status = 'UPCOMING',
+                status = 'ACTIVE',
                 approved_by = :approved_by,
                 approved_date = NOW(),
                 start_date = NOW()

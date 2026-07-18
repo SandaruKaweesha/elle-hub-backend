@@ -82,7 +82,7 @@ class TournamentService{
     ): array
     {
         $allowedStatus = [
-            "UPCOMING",
+            "ACTIVE",
             "ONGOING",
             "COMPLETED",
             "CANCELLED"
@@ -193,7 +193,7 @@ class TournamentService{
     public function filterTournamentsByStatus(string $status): array
     {
         $allowedStatuses = [
-            "UPCOMING",
+            "ACTIVE",
             "ONGOING",
             "COMPLETED",
             "CANCELLED"
