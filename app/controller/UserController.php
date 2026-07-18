@@ -167,4 +167,40 @@ class UserController{
         header("Content-Type: application/json");
         echo json_encode($result);
     }
+
+    public function approveUser($userId)
+    {
+        require_once __DIR__ . "/../core/AuthMiddleware.php";
+        AuthMiddleware::requireRole(['ADMIN']);
+
+        $result = $this->userService->updateUserStatus((int) $userId, 'APPROVED');
+
+        header("Content-Type: application/json");
+        if ($result["success"]) {
+            http_response_code(200);
+        } else {
+            http_response_code(400);
+        }
+
+        echo json_encode($result);
+    }
+
+    public function requestDeletion()
+    {
+        require_once __DIR__ . "/../core/AuthMiddleware.php";
+        $payload = AuthMiddleware::authenticate();
+        $userId = (int)$payload['userId'];
+
+        $result = $this->userService->updateUserStatus($userId, 'DELETION_PENDING');
+
+        header("Content-Type: application/json");
+        if ($result["success"]) {
+            http_response_code(200);
+            $result['message'] = "Account deletion request submitted successfully.";
+        } else {
+            http_response_code(400);
+        }
+
+        echo json_encode($result);
+    }
 }

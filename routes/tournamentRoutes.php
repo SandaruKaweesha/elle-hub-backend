@@ -79,4 +79,22 @@ $router->post(
 $router->get(
     "/tournaments/{id}/results",
     [TournamentResultController::class, "getResults"]
+$router->get(
+    "/organizer/{id}/team-requests",
+    [TournamentTeamRequestController::class, "getOrganizerTeamRequests"]
+);
+
+$router->post(
+    "/tournament/request/approve",
+    [TournamentTeamRequestController::class, "approveRequest"]
+);
+
+$router->post(
+    "/tournament/request/reject",
+    [TournamentTeamRequestController::class, "rejectRequest"]
+);
+
+$router->get(
+    "/admin/tournaments",
+    [TournamentController::class, "getAllTournaments"]
 );

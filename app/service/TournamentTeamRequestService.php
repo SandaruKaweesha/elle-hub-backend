@@ -94,9 +94,9 @@ class TournamentTeamRequestService
             ];
         }
 
-        // Check if tournament is finalized (status is not UPCOMING)
-        $tournamentStatus = strtoupper($existing['tournament_status'] ?? 'UPCOMING');
-        if ($tournamentStatus !== 'UPCOMING') {
+        // Check if tournament is finalized (status is not ACTIVE)
+        $tournamentStatus = strtoupper($existing['tournament_status'] ?? 'ACTIVE');
+        if ($tournamentStatus !== 'ACTIVE') {
             return [
                 "success" => false,
                 "message" => "Cannot leave: The tournament setup has been finalized by the organizer."
@@ -114,6 +114,84 @@ class TournamentTeamRequestService
         return [
             "success" => false,
             "message" => "Failed to leave the tournament."
+        ];
+    }
+
+    public function getOrganizerTeamRequests(int $organizerId): array
+    {
+        try {
+            $data = $this->repository->findByOrganizerId($organizerId);
+            return [
+                "success" => true,
+                "data" => $data
+            ];
+        } catch (Exception $e) {
+            return [
+                "success" => false,
+                "message" => "Database error: " . $e->getMessage()
+            ];
+        }
+    }
+
+    public function approveRequest(int $tournamentId, int $teamUserId): array
+    {
+        $existing = $this->repository->findByKeys($tournamentId, $teamUserId);
+        if (!$existing) {
+            return [
+                "success" => false,
+                "message" => "Request not found."
+            ];
+        }
+
+        if ($existing['status'] !== 'PENDING') {
+            return [
+                "success" => false,
+                "message" => "Only pending requests can be approved."
+            ];
+        }
+
+        $updated = $this->repository->updateStatus($tournamentId, $teamUserId, 'APPROVED');
+        if ($updated) {
+            return [
+                "success" => true,
+                "message" => "Team request approved successfully."
+            ];
+        }
+
+        return [
+            "success" => false,
+            "message" => "Failed to approve team request."
+        ];
+    }
+
+    public function rejectRequest(int $tournamentId, int $teamUserId): array
+    {
+        $existing = $this->repository->findByKeys($tournamentId, $teamUserId);
+        if (!$existing) {
+            return [
+                "success" => false,
+                "message" => "Request not found."
+            ];
+        }
+
+        if ($existing['status'] !== 'PENDING') {
+            return [
+                "success" => false,
+                "message" => "Only pending requests can be rejected."
+            ];
+        }
+
+        $updated = $this->repository->updateStatus($tournamentId, $teamUserId, 'REJECTED');
+        if ($updated) {
+            return [
+                "success" => true,
+                "message" => "Team request rejected successfully."
+            ];
+        }
+
+        return [
+            "success" => false,
+            "message" => "Failed to reject team request."
         ];
     }
 }
