@@ -63,10 +63,46 @@ class UserRepository{
 
     public function findAll(): array
     {
-        $sql = "SELECT * FROM users";
+        $sql = "SELECT u.*,
+                       a.full_name AS admin_name,
+                       t.team_name,
+                       o.organization_name,
+                       s.company_name,
+                       p.playground_name,
+                       r.full_name AS referee_name,
+                       COALESCE(t.contact_number, o.contact_number, s.contact_number, p.contact_number, r.contact_number) AS contact_number
+                FROM users u
+                LEFT JOIN admins a ON u.user_id = a.user_id
+                LEFT JOIN teams t ON u.user_id = t.user_id
+                LEFT JOIN organizers o ON u.user_id = o.user_id
+                LEFT JOIN sponsors s ON u.user_id = s.user_id
+                LEFT JOIN playgrounds p ON u.user_id = p.user_id
+                LEFT JOIN referees r ON u.user_id = r.user_id
+                ORDER BY u.created_at DESC";
+
         $statement = $this->connection->prepare($sql);
         $statement->execute();
         $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($rows as &$row) {
+            $role = $row['role'];
+            if ($role === 'ADMIN' && $row['admin_name']) {
+                $row['display_name'] = $row['admin_name'];
+            } elseif ($role === 'TEAM' && $row['team_name']) {
+                $row['display_name'] = $row['team_name'];
+            } elseif ($role === 'ORGANIZER' && $row['organization_name']) {
+                $row['display_name'] = $row['organization_name'];
+            } elseif ($role === 'SPONSOR' && $row['company_name']) {
+                $row['display_name'] = $row['company_name'];
+            } elseif ($role === 'PLAYGROUND' && $row['playground_name']) {
+                $row['display_name'] = $row['playground_name'];
+            } elseif ($role === 'REFEREE' && $row['referee_name']) {
+                $row['display_name'] = $row['referee_name'];
+            } else {
+                $row['display_name'] = 'System User';
+            }
+        }
+
         return $rows;
     }
 
@@ -211,6 +247,16 @@ class UserRepository{
         $sql = "UPDATE users SET password = :password WHERE user_id = :user_id";
         $statement = $this->connection->prepare($sql);
         $statement->bindValue(':password', $hashedPassword);
+        $statement->bindValue(':user_id', $userId, PDO::PARAM_INT);
+        $statement->execute();
+        return $statement->rowCount() > 0;
+    }
+
+    public function updateStatus(int $userId, string $status): bool
+    {
+        $sql = "UPDATE users SET status = :status WHERE user_id = :user_id";
+        $statement = $this->connection->prepare($sql);
+        $statement->bindValue(':status', $status);
         $statement->bindValue(':user_id', $userId, PDO::PARAM_INT);
         $statement->execute();
         return $statement->rowCount() > 0;

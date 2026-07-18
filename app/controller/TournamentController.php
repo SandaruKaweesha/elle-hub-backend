@@ -2,6 +2,8 @@
 
 require_once __DIR__ . "/../service/TournamentService.php";
 require_once __DIR__ . "/../model/Tournament.php";
+require_once __DIR__ . "/../core/AuthMiddleware.php";
+
 class TournamentController{
     private const JSON_HEADER = "Content-Type: application/json";
     private $tournamentService;
@@ -192,5 +194,12 @@ class TournamentController{
         echo json_encode($result);
     }
 
+    public function getAllTournaments()
+    {
+        AuthMiddleware::requireRole(['ADMIN']);
+        header("Content-Type: application/json");
+        $result = $this->tournamentService->getAllTournaments();
+        echo json_encode($result);
+    }
 }
 

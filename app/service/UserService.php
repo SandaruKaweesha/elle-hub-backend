@@ -189,4 +189,28 @@ class UserService{
             "message" => "Failed to update password."
         ];
     }
+
+    public function updateUserStatus(int $userId, string $status): array
+    {
+        $user = $this->userRepository->findById($userId);
+        if ($user === null) {
+            return [
+                "success" => false,
+                "message" => "User not found."
+            ];
+        }
+
+        $updated = $this->userRepository->updateStatus($userId, $status);
+        if ($updated) {
+            return [
+                "success" => true,
+                "message" => "User status updated to {$status} successfully."
+            ];
+        }
+
+        return [
+            "success" => false,
+            "message" => "Failed to update user status."
+        ];
+    }
 }
