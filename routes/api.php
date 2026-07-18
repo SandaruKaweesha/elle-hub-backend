@@ -7,6 +7,7 @@ require_once __DIR__ . "/authRoutes.php";
 
 require_once __DIR__ . "/tournamentRoutes.php";
 require_once __DIR__ . "/playerRoutes.php";
+require_once __DIR__ . "/certificateRoutes.php";
 //require_once __DIR__ . "/refereeRoutes.php";
 //
 //require_once __DIR__ . "/playgroundRoutes.php";
