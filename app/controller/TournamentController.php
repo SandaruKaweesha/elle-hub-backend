@@ -2,6 +2,8 @@
 
 require_once __DIR__ . "/../service/TournamentService.php";
 require_once __DIR__ . "/../model/Tournament.php";
+require_once __DIR__ . "/../core/AuthMiddleware.php";
+
 class TournamentController{
     private const JSON_HEADER = "Content-Type: application/json";
     private $tournamentService;
@@ -24,6 +26,7 @@ class TournamentController{
         $tournament->setLocation($requestObject->location ?? null);
         $tournament->setStartDate($requestObject->startDate ?? null);
         $tournament->setEndDate($requestObject->endDate ?? null);
+        $tournament->setTournamentHeldDate($requestObject->tournamentHeldDate ?? null);
         $tournament->setMaximumTeamLimit($requestObject->maximumTeamLimit ?? null);
         $tournament->setRules($requestObject->rules ?? null);
         $tournament->setPrizeDetails($requestObject->prizeDetails ?? null);
@@ -191,5 +194,12 @@ class TournamentController{
         echo json_encode($result);
     }
 
+    public function getAllTournaments()
+    {
+        AuthMiddleware::requireRole(['ADMIN']);
+        header("Content-Type: application/json");
+        $result = $this->tournamentService->getAllTournaments();
+        echo json_encode($result);
+    }
 }
 
