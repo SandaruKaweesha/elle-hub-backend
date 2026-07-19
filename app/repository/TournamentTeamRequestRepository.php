@@ -11,23 +11,24 @@ class TournamentTeamRequestRepository
         $this->connection = Database::getConnection();
     }
 
-    public function save(int $tournamentId, int $teamUserId): bool
+    public function save(int $tournamentId, int $teamUserId, string $initiatedBy = 'TEAM'): bool
     {
         $sql = "INSERT INTO tournament_team_requests 
-                (tournament_id, team_user_id, request_date, status)
+                (tournament_id, team_user_id, request_date, status, initiated_by)
                 VALUES 
-                (:tournament_id, :team_user_id, NOW(), 'PENDING')";
+                (:tournament_id, :team_user_id, NOW(), 'PENDING', :initiated_by)";
 
         $statement = $this->connection->prepare($sql);
         $statement->bindValue(":tournament_id", $tournamentId, PDO::PARAM_INT);
         $statement->bindValue(":team_user_id", $teamUserId, PDO::PARAM_INT);
+        $statement->bindValue(":initiated_by", $initiatedBy);
 
         return $statement->execute();
     }
 
     public function findByTeamId(int $teamUserId): array
     {
-        $sql = "SELECT r.tournament_id, r.team_user_id, r.request_date, r.status,
+        $sql = "SELECT r.tournament_id, r.team_user_id, r.request_date, r.status, r.initiated_by,
                        t.title AS tournament_title, t.location, t.tournament_held_date, t.status AS tournament_status
                 FROM tournament_team_requests r
                 JOIN tournaments t ON r.tournament_id = t.tournament_id
@@ -42,7 +43,7 @@ class TournamentTeamRequestRepository
 
     public function findByKeys(int $tournamentId, int $teamUserId): ?array
     {
-        $sql = "SELECT r.tournament_id, r.team_user_id, r.request_date, r.status,
+        $sql = "SELECT r.tournament_id, r.team_user_id, r.request_date, r.status, r.initiated_by,
                        t.status AS tournament_status
                 FROM tournament_team_requests r
                 JOIN tournaments t ON r.tournament_id = t.tournament_id
@@ -85,9 +86,10 @@ class TournamentTeamRequestRepository
 
     public function findByOrganizerId(int $organizerId): array
     {
-        $sql = "SELECT r.tournament_id, r.team_user_id, r.request_date, r.status,
+        $sql = "SELECT r.tournament_id, r.team_user_id, r.request_date, r.status, r.initiated_by,
                        t.title AS tournament_title,
-                       tm.team_name, tm.contact_number, tm.rating, tm.district
+                       tm.team_name, tm.contact_number, tm.rating, tm.district,
+                       (SELECT COUNT(*) FROM players WHERE team_user_id = r.team_user_id) AS squad_size
                 FROM tournament_team_requests r
                 JOIN tournaments t ON r.tournament_id = t.tournament_id
                 JOIN teams tm ON r.team_user_id = tm.user_id

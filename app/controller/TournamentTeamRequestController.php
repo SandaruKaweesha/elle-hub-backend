@@ -144,7 +144,7 @@ class TournamentTeamRequestController
 
     public function approveRequest()
     {
-        $authPayload = AuthMiddleware::requireRole(['ORGANIZER']);
+        $authPayload = AuthMiddleware::requireRole(['ORGANIZER', 'TEAM']);
         
         $requestBody = file_get_contents("php://input");
         $requestObject = json_decode($requestBody);
@@ -173,7 +173,7 @@ class TournamentTeamRequestController
 
     public function rejectRequest()
     {
-        $authPayload = AuthMiddleware::requireRole(['ORGANIZER']);
+        $authPayload = AuthMiddleware::requireRole(['ORGANIZER', 'TEAM']);
         
         $requestBody = file_get_contents("php://input");
         $requestObject = json_decode($requestBody);
@@ -189,6 +189,36 @@ class TournamentTeamRequestController
         }
 
         $result = $this->service->rejectRequest($tournamentId, $teamUserId);
+
+        if ($result["success"]) {
+            http_response_code(200);
+        } else {
+            http_response_code(400);
+        }
+
+        header("Content-Type: application/json");
+        echo json_encode($result);
+    }
+
+    public function inviteTeam()
+    {
+        $authPayload = AuthMiddleware::requireRole(['ORGANIZER']);
+        $organizerId = (int)$authPayload['userId'];
+
+        $requestBody = file_get_contents("php://input");
+        $requestObject = json_decode($requestBody);
+
+        $tournamentId = isset($requestObject->tournamentId) ? (int)$requestObject->tournamentId : null;
+        $teamUserId = isset($requestObject->teamUserId) ? (int)$requestObject->teamUserId : null;
+
+        if (!$tournamentId || !$teamUserId) {
+            http_response_code(400);
+            header("Content-Type: application/json");
+            echo json_encode(["success" => false, "message" => "Tournament ID and Team User ID are required."]);
+            return;
+        }
+
+        $result = $this->service->inviteTeam($tournamentId, $teamUserId, $organizerId);
 
         if ($result["success"]) {
             http_response_code(200);
