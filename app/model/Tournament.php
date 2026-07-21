@@ -11,6 +11,7 @@ class Tournament
     private $endDate;
     private $tournamentHeldDate;
     private $maximumTeamLimit;
+    private $maximumRefereeLimit;
     private $rules;
     private $prizeDetails;
     private $status;
@@ -30,6 +31,7 @@ class Tournament
         $endDate = null,
         $tournamentHeldDate = null,
         $maximumTeamLimit = null,
+        $maximumRefereeLimit = 2,
         $rules = null,
         $prizeDetails = null,
         $status = null,
@@ -49,6 +51,7 @@ class Tournament
         $this->endDate = $endDate;
         $this->tournamentHeldDate = $tournamentHeldDate;
         $this->maximumTeamLimit = $maximumTeamLimit;
+        $this->maximumRefereeLimit = $maximumRefereeLimit;
         $this->rules = $rules;
         $this->prizeDetails = $prizeDetails;
         $this->status = $status;
@@ -98,6 +101,16 @@ class Tournament
     public function getMaximumTeamLimit()
     {
         return $this->maximumTeamLimit;
+    }
+
+    public function getMaximumRefereeLimit()
+    {
+        return $this->maximumRefereeLimit;
+    }
+
+    public function setMaximumRefereeLimit($maximumRefereeLimit)
+    {
+        $this->maximumRefereeLimit = $maximumRefereeLimit;
     }
 
     public function getRules()

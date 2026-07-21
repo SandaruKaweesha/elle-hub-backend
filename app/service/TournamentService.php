@@ -314,5 +314,292 @@ class TournamentService{
             ];
         }
     }
+
+    public function getTournamentAssignments(int $tournamentId): array
+    {
+        try {
+            $teamUserIds = [];
+            $stmt = Database::getConnection()->prepare("SELECT team_user_id FROM tournament_team_requests WHERE tournament_id = ? AND status = 'APPROVED'");
+            $stmt->execute([$tournamentId]);
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $teamUserIds[] = $row['team_user_id'];
+            }
+
+            $refereeUserIds = [];
+            $stmt = Database::getConnection()->prepare("SELECT referee_user_id FROM tournament_referee_requests WHERE tournament_id = ? AND status = 'APPROVED'");
+            $stmt->execute([$tournamentId]);
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $refereeUserIds[] = $row['referee_user_id'];
+            }
+
+            $sponsorUserIds = [];
+            $stmt = Database::getConnection()->prepare("SELECT sponsor_user_id FROM tournament_sponsor_requests WHERE tournament_id = ? AND status = 'APPROVED'");
+            $stmt->execute([$tournamentId]);
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $sponsorUserIds[] = $row['sponsor_user_id'];
+            }
+
+            $playgroundUserId = null;
+            $stmt = Database::getConnection()->prepare("SELECT playground_user_id FROM tournament_playground_requests WHERE tournament_id = ? AND status = 'APPROVED' LIMIT 1");
+            $stmt->execute([$tournamentId]);
+            if ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $playgroundUserId = $row['playground_user_id'];
+            }
+
+            return [
+                "success" => true,
+                "data" => [
+                    "teamUserIds" => $teamUserIds,
+                    "refereeUserIds" => $refereeUserIds,
+                    "sponsorUserIds" => $sponsorUserIds,
+                    "playgroundUserId" => $playgroundUserId
+                ]
+            ];
+        } catch (Exception $e) {
+            return ["success" => false, "message" => $e->getMessage()];
+        }
+    }
+
+    public function saveTournamentAssignments(int $tournamentId, object $request): array
+    {
+        try {
+            Database::beginTransaction();
+            $conn = Database::getConnection();
+
+            // Clear old assignments (overwrite)
+            $conn->prepare("DELETE FROM tournament_team_requests WHERE tournament_id = ? AND status = 'APPROVED'")->execute([$tournamentId]);
+            $conn->prepare("DELETE FROM tournament_referee_requests WHERE tournament_id = ? AND status = 'APPROVED'")->execute([$tournamentId]);
+
+            if (isset($request->teamUserIds) && is_array($request->teamUserIds)) {
+                // Ensure initiated_by is handled if schema requires it, checking ER Diagram: initiated_by ENUM
+                $stmt = $conn->prepare("INSERT INTO tournament_team_requests (tournament_id, team_user_id, status, request_date, initiated_by) VALUES (?, ?, 'APPROVED', NOW(), 'ORGANIZER')");
+                foreach ($request->teamUserIds as $tid) {
+                    $stmt->execute([$tournamentId, $tid]);
+                }
+            }
+
+            if (isset($request->refereeUserIds) && is_array($request->refereeUserIds)) {
+                $stmt = $conn->prepare("INSERT INTO tournament_referee_requests (tournament_id, referee_user_id, status, request_date) VALUES (?, ?, 'APPROVED', NOW())");
+                foreach ($request->refereeUserIds as $rid) {
+                    $stmt->execute([$tournamentId, $rid]);
+                }
+            }
+            Database::commit();
+            return ["success" => true, "message" => "Assignments updated successfully"];
+        } catch (Exception $e) {
+            Database::rollback();
+            return ["success" => false, "message" => $e->getMessage()];
+        }
+    }
+
+    public function getPlaygroundRequests(int $tournamentId): array
+    {
+        try {
+            $conn = Database::getConnection();
+            $stmt = $conn->prepare("
+                SELECT p.user_id, p.playground_name, p.located_district, p.location, p.capacity,
+                       tpr.status, tpr.initiated_by
+                FROM playgrounds p
+                LEFT JOIN tournament_playground_requests tpr 
+                       ON p.user_id = tpr.playground_user_id AND tpr.tournament_id = ?
+            ");
+            $stmt->execute([$tournamentId]);
+            $playgrounds = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            return ["success" => true, "data" => $playgrounds];
+        } catch (Exception $e) {
+            return ["success" => false, "message" => $e->getMessage()];
+        }
+    }
+
+    public function sendPlaygroundRequest(int $tournamentId, int $playgroundUserId, string $initiatedBy): array
+    {
+        try {
+            $conn = Database::getConnection();
+            // Check if already requested
+            $stmt = $conn->prepare("SELECT status FROM tournament_playground_requests WHERE tournament_id = ? AND playground_user_id = ?");
+            $stmt->execute([$tournamentId, $playgroundUserId]);
+            if ($stmt->fetch()) {
+                return ["success" => false, "message" => "Request already exists"];
+            }
+
+            $stmt = $conn->prepare("INSERT INTO tournament_playground_requests (tournament_id, playground_user_id, status, initiated_by, request_date) VALUES (?, ?, 'PENDING', ?, NOW())");
+            $stmt->execute([$tournamentId, $playgroundUserId, $initiatedBy]);
+
+            return ["success" => true, "message" => "Request sent successfully"];
+        } catch (Exception $e) {
+            return ["success" => false, "message" => $e->getMessage()];
+        }
+    }
+
+    public function respondToPlaygroundRequest(int $tournamentId, int $playgroundUserId, string $status): array
+    {
+        try {
+            $conn = Database::getConnection();
+            
+            // Note: The schema has ACCEPTED, not APPROVED. We use the incoming status exactly.
+            $stmt = $conn->prepare("UPDATE tournament_playground_requests SET status = ? WHERE tournament_id = ? AND playground_user_id = ?");
+            $stmt->execute([$status, $tournamentId, $playgroundUserId]);
+
+            return ["success" => true, "message" => "Request updated successfully"];
+        } catch (Exception $e) {
+            return ["success" => false, "message" => $e->getMessage()];
+        }
+    }
+
+    // Sponsor Requests
+    public function getSponsorRequests(int $tournamentId): array
+    {
+        try {
+            $conn = Database::getConnection();
+            $stmt = $conn->prepare("
+                SELECT u.user_id, u.display_name, u.district, u.rating,
+                       tsr.status, tsr.initiated_by
+                FROM users u
+                LEFT JOIN tournament_sponsor_requests tsr 
+                       ON u.user_id = tsr.sponsor_user_id AND tsr.tournament_id = ?
+                WHERE u.role = 'SPONSOR' AND u.status = 'APPROVED'
+            ");
+            $stmt->execute([$tournamentId]);
+            $sponsors = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            return ["success" => true, "data" => $sponsors];
+        } catch (Exception $e) {
+            return ["success" => false, "message" => $e->getMessage()];
+        }
+    }
+
+    public function sendSponsorRequest(int $tournamentId, int $sponsorUserId, string $initiatedBy): array
+    {
+        try {
+            $conn = Database::getConnection();
+            // Check if already requested
+            $stmt = $conn->prepare("SELECT status FROM tournament_sponsor_requests WHERE tournament_id = ? AND sponsor_user_id = ?");
+            $stmt->execute([$tournamentId, $sponsorUserId]);
+            if ($stmt->fetch()) {
+                return ["success" => false, "message" => "Request already exists"];
+            }
+
+            $stmt = $conn->prepare("INSERT INTO tournament_sponsor_requests (tournament_id, sponsor_user_id, status, initiated_by, request_date) VALUES (?, ?, 'PENDING', ?, NOW())");
+            $stmt->execute([$tournamentId, $sponsorUserId, $initiatedBy]);
+
+            return ["success" => true, "message" => "Request sent successfully"];
+        } catch (Exception $e) {
+            return ["success" => false, "message" => $e->getMessage()];
+        }
+    }
+
+    public function respondToSponsorRequest(int $tournamentId, int $sponsorUserId, string $status): array
+    {
+        try {
+            $conn = Database::getConnection();
+            
+            $stmt = $conn->prepare("UPDATE tournament_sponsor_requests SET status = ? WHERE tournament_id = ? AND sponsor_user_id = ?");
+            $stmt->execute([$status, $tournamentId, $sponsorUserId]);
+
+            return ["success" => true, "message" => "Request updated successfully"];
+        } catch (Exception $e) {
+            return ["success" => false, "message" => $e->getMessage()];
+        }
+    }
+
+    public function getSponsorIncomingRequests(int $sponsorUserId): array
+    {
+        try {
+            $conn = Database::getConnection();
+            $stmt = $conn->prepare("
+                SELECT t.tournament_id, t.title, t.description, t.location, t.tournament_held_date,
+                       tsr.status, tsr.request_date
+                FROM tournament_sponsor_requests tsr
+                JOIN tournaments t ON tsr.tournament_id = t.tournament_id
+                WHERE tsr.sponsor_user_id = ? AND tsr.initiated_by = 'ORGANIZER'
+                ORDER BY tsr.request_date DESC
+            ");
+            $stmt->execute([$sponsorUserId]);
+            $requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            return ["success" => true, "data" => $requests];
+        } catch (Exception $e) {
+            return ["success" => false, "message" => $e->getMessage()];
+        }
+    }
+
+    // Referee Requests
+    public function getRefereeRequests(int $tournamentId): array
+    {
+        try {
+            $sql = "SELECT r.request_id, r.tournament_id, r.referee_user_id, r.request_date, r.status, r.initiated_by,
+                           u.display_name, u.phone, rf.rating, rf.experience_years
+                    FROM tournament_referee_requests r
+                    JOIN users u ON r.referee_user_id = u.user_id
+                    LEFT JOIN referees rf ON r.referee_user_id = rf.user_id
+                    WHERE r.tournament_id = ?
+                    ORDER BY r.request_date DESC";
+            $stmt = Database::getConnection()->prepare($sql);
+            $stmt->execute([$tournamentId]);
+            return ["success" => true, "data" => $stmt->fetchAll(PDO::FETCH_ASSOC)];
+        } catch (Exception $e) {
+            return ["success" => false, "message" => $e->getMessage()];
+        }
+    }
+
+    public function sendRefereeRequest(int $tournamentId, int $refereeUserId, string $initiatedBy = 'ORGANIZER'): array
+    {
+        try {
+            $conn = Database::getConnection();
+
+            // Check maximum referee limit
+            $stmtLimit = $conn->prepare("SELECT maximum_referee_limit FROM tournaments WHERE tournament_id = ?");
+            $stmtLimit->execute([$tournamentId]);
+            $tRow = $stmtLimit->fetch(PDO::FETCH_ASSOC);
+            $maxLimit = (int)($tRow['maximum_referee_limit'] ?? 2);
+
+            if ($maxLimit > 0) {
+                $stmtCount = $conn->prepare("SELECT COUNT(*) AS total FROM tournament_referee_requests WHERE tournament_id = ? AND status IN ('ACCEPTED', 'APPROVED')");
+                $stmtCount->execute([$tournamentId]);
+                $cRow = $stmtCount->fetch(PDO::FETCH_ASSOC);
+                if ((int)($cRow['total'] ?? 0) >= $maxLimit) {
+                    return ["success" => false, "message" => "Cannot send request: Maximum limit of {$maxLimit} referees has been reached for this tournament."];
+                }
+            }
+
+            $stmt = $conn->prepare("INSERT INTO tournament_referee_requests (tournament_id, referee_user_id, status, request_date, initiated_by) VALUES (?, ?, 'PENDING', NOW(), ?)");
+            $stmt->execute([$tournamentId, $refereeUserId, $initiatedBy]);
+            return ["success" => true, "message" => "Referee request submitted successfully"];
+        } catch (Exception $e) {
+            return ["success" => false, "message" => $e->getMessage()];
+        }
+    }
+
+    public function respondToRefereeRequest(int $tournamentId, int $refereeUserId, string $status): array
+    {
+        try {
+            $conn = Database::getConnection();
+            $dbStatus = ($status === 'APPROVED' || $status === 'ACCEPTED') ? 'ACCEPTED' : 'REJECTED';
+
+            if ($dbStatus === 'ACCEPTED') {
+                $stmtLimit = $conn->prepare("SELECT maximum_referee_limit FROM tournaments WHERE tournament_id = ?");
+                $stmtLimit->execute([$tournamentId]);
+                $tRow = $stmtLimit->fetch(PDO::FETCH_ASSOC);
+                $maxLimit = (int)($tRow['maximum_referee_limit'] ?? 2);
+
+                if ($maxLimit > 0) {
+                    $stmtCount = $conn->prepare("SELECT COUNT(*) AS total FROM tournament_referee_requests WHERE tournament_id = ? AND status IN ('ACCEPTED', 'APPROVED')");
+                    $stmtCount->execute([$tournamentId]);
+                    $cRow = $stmtCount->fetch(PDO::FETCH_ASSOC);
+                    if ((int)($cRow['total'] ?? 0) >= $maxLimit) {
+                        return ["success" => false, "message" => "Cannot approve referee: Maximum limit of {$maxLimit} referees has been reached for this tournament."];
+                    }
+                }
+            }
+
+            $stmt = $conn->prepare("UPDATE tournament_referee_requests SET status = ? WHERE tournament_id = ? AND referee_user_id = ?");
+            $stmt->execute([$dbStatus, $tournamentId, $refereeUserId]);
+
+            return ["success" => true, "message" => "Referee request updated successfully"];
+        } catch (Exception $e) {
+            return ["success" => false, "message" => $e->getMessage()];
+        }
+    }
 }
 

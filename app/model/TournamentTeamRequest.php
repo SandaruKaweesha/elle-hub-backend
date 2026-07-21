@@ -6,17 +6,20 @@ class TournamentTeamRequest
     private $teamUserId;
     private $requestDate;
     private $status;
+    private $initiatedBy;
 
     public function __construct(
         $tournamentId = null,
         $teamUserId = null,
         $requestDate = null,
-        $status = null
+        $status = null,
+        $initiatedBy = 'TEAM'
     ) {
         $this->tournamentId = $tournamentId;
         $this->teamUserId = $teamUserId;
         $this->requestDate = $requestDate;
         $this->status = $status;
+        $this->initiatedBy = $initiatedBy;
     }
 
     public function getTournamentId()
@@ -57,5 +60,15 @@ class TournamentTeamRequest
     public function setStatus($status)
     {
         $this->status = $status;
+    }
+
+    public function getInitiatedBy()
+    {
+        return $this->initiatedBy;
+    }
+
+    public function setInitiatedBy($initiatedBy)
+    {
+        $this->initiatedBy = $initiatedBy;
     }
 }

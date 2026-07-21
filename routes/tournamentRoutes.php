@@ -54,6 +54,11 @@ $router->post(
     [TournamentTeamRequestController::class, "submitRequest"]
 );
 
+$router->post(
+    "/tournament/request/invite",
+    [TournamentTeamRequestController::class, "inviteTeam"]
+);
+
 $router->get(
     "/team/{id}/requests",
     [TournamentTeamRequestController::class, "getTeamRequests"]
@@ -74,6 +79,11 @@ $router->get(
     [TournamentTeamRequestController::class, "getOrganizerTeamRequests"]
 );
 
+$router->get(
+    "/tournament/{id}/team-requests",
+    [TournamentTeamRequestController::class, "getTournamentTeamRequests"]
+);
+
 $router->post(
     "/tournament/request/approve",
     [TournamentTeamRequestController::class, "approveRequest"]
@@ -87,4 +97,73 @@ $router->post(
 $router->get(
     "/admin/tournaments",
     [TournamentController::class, "getAllTournaments"]
+);
+
+// Tournament Assignments and Finalization
+$router->get(
+    "/tournament/{id}/assignments",
+    [TournamentController::class, "getTournamentAssignments"]
+);
+
+$router->post(
+    "/tournament/{id}/assignments",
+    [TournamentController::class, "saveTournamentAssignments"]
+);
+
+$router->post(
+    "/tournament/{id}/finalize",
+    [TournamentController::class, "finalizeTournament"]
+);
+
+// Advanced Playground Request System
+$router->get(
+    "/tournament/{id}/playground-requests",
+    [TournamentController::class, "getPlaygroundRequests"]
+);
+
+$router->post(
+    "/tournament/{id}/playground-requests/send",
+    [TournamentController::class, "sendPlaygroundRequest"]
+);
+
+$router->post(
+    "/tournament/{id}/playground-requests/respond",
+    [TournamentController::class, "respondToPlaygroundRequest"]
+);
+
+// Advanced Sponsor Request System
+$router->get(
+    "/tournament/{id}/sponsor-requests",
+    [TournamentController::class, "getSponsorRequests"]
+);
+
+$router->post(
+    "/tournament/{id}/sponsor-requests/send",
+    [TournamentController::class, "sendSponsorRequest"]
+);
+
+$router->post(
+    "/tournament/{id}/sponsor-requests/respond",
+    [TournamentController::class, "respondToSponsorRequest"]
+);
+
+$router->get(
+    "/sponsor/{id}/requests",
+    [TournamentController::class, "getSponsorIncomingRequests"]
+);
+
+// Advanced Referee Request System
+$router->get(
+    "/tournament/{id}/referee-requests",
+    [TournamentController::class, "getRefereeRequests"]
+);
+
+$router->post(
+    "/tournament/{id}/referee-requests/send",
+    [TournamentController::class, "sendRefereeRequest"]
+);
+
+$router->post(
+    "/tournament/{id}/referee-requests/respond",
+    [TournamentController::class, "respondToRefereeRequest"]
 );

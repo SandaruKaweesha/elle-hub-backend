@@ -41,6 +41,35 @@ class TournamentTeamRequestController
         echo json_encode($result);
     }
 
+    public function inviteTeam()
+    {
+        $authPayload = AuthMiddleware::requireRole(['ORGANIZER']);
+
+        $requestBody = file_get_contents("php://input");
+        $requestObject = json_decode($requestBody);
+
+        $tournamentId = isset($requestObject->tournamentId) ? (int)$requestObject->tournamentId : null;
+        $teamUserId = isset($requestObject->teamUserId) ? (int)$requestObject->teamUserId : null;
+
+        if (!$tournamentId || !$teamUserId) {
+            http_response_code(400);
+            header("Content-Type: application/json");
+            echo json_encode(["success" => false, "message" => "Tournament ID and Team User ID are required."]);
+            return;
+        }
+
+        $result = $this->service->sendOrganizerInvitation($tournamentId, $teamUserId);
+
+        if ($result["success"]) {
+            http_response_code(201);
+        } else {
+            http_response_code(400);
+        }
+
+        header("Content-Type: application/json");
+        echo json_encode($result);
+    }
+
     public function getTeamRequests($teamUserId = null)
     {
         $authPayload = AuthMiddleware::requireRole(['TEAM']);
@@ -142,6 +171,16 @@ class TournamentTeamRequestController
         echo json_encode($result);
     }
 
+    public function getTournamentTeamRequests($tournamentId)
+    {
+        AuthMiddleware::requireRole(['ORGANIZER', 'ADMIN', 'TEAM']);
+        $result = $this->service->getTournamentTeamRequests((int)$tournamentId);
+
+        http_response_code(200);
+        header("Content-Type: application/json");
+        echo json_encode($result);
+    }
+
     public function approveRequest()
     {
         $authPayload = AuthMiddleware::requireRole(['ORGANIZER', 'TEAM']);
@@ -189,36 +228,6 @@ class TournamentTeamRequestController
         }
 
         $result = $this->service->rejectRequest($tournamentId, $teamUserId);
-
-        if ($result["success"]) {
-            http_response_code(200);
-        } else {
-            http_response_code(400);
-        }
-
-        header("Content-Type: application/json");
-        echo json_encode($result);
-    }
-
-    public function inviteTeam()
-    {
-        $authPayload = AuthMiddleware::requireRole(['ORGANIZER']);
-        $organizerId = (int)$authPayload['userId'];
-
-        $requestBody = file_get_contents("php://input");
-        $requestObject = json_decode($requestBody);
-
-        $tournamentId = isset($requestObject->tournamentId) ? (int)$requestObject->tournamentId : null;
-        $teamUserId = isset($requestObject->teamUserId) ? (int)$requestObject->teamUserId : null;
-
-        if (!$tournamentId || !$teamUserId) {
-            http_response_code(400);
-            header("Content-Type: application/json");
-            echo json_encode(["success" => false, "message" => "Tournament ID and Team User ID are required."]);
-            return;
-        }
-
-        $result = $this->service->inviteTeam($tournamentId, $teamUserId, $organizerId);
 
         if ($result["success"]) {
             http_response_code(200);

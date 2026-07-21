@@ -28,6 +28,7 @@ class TournamentController{
         $tournament->setEndDate($requestObject->endDate ?? null);
         $tournament->setTournamentHeldDate($requestObject->tournamentHeldDate ?? null);
         $tournament->setMaximumTeamLimit($requestObject->maximumTeamLimit ?? null);
+        $tournament->setMaximumRefereeLimit($requestObject->maximumRefereeLimit ?? $requestObject->requiredReferees ?? 2);
         $tournament->setRules($requestObject->rules ?? null);
         $tournament->setPrizeDetails($requestObject->prizeDetails ?? null);
 
@@ -201,5 +202,160 @@ class TournamentController{
         $result = $this->tournamentService->getAllTournaments();
         echo json_encode($result);
     }
-}
 
+    public function getTournamentAssignments($tournamentId)
+    {
+        header(self::JSON_HEADER);
+        $result = $this->tournamentService->getTournamentAssignments((int) $tournamentId);
+        echo json_encode($result);
+    }
+
+    public function saveTournamentAssignments($tournamentId)
+    {
+        header(self::JSON_HEADER);
+        $requestBody = file_get_contents("php://input");
+        $requestObject = json_decode($requestBody);
+        
+        if ($requestObject === null) {
+            http_response_code(400);
+            echo json_encode(["success" => false, "message" => "Invalid JSON payload"]);
+            return;
+        }
+
+        $result = $this->tournamentService->saveTournamentAssignments((int) $tournamentId, $requestObject);
+        echo json_encode($result);
+    }
+
+    public function finalizeTournament($tournamentId)
+    {
+        header(self::JSON_HEADER);
+        $result = $this->tournamentService->updateTournamentStatus((int) $tournamentId, "ONGOING");
+        echo json_encode($result);
+    }
+
+    public function getPlaygroundRequests($tournamentId)
+    {
+        header(self::JSON_HEADER);
+        $result = $this->tournamentService->getPlaygroundRequests((int) $tournamentId);
+        echo json_encode($result);
+    }
+
+    public function sendPlaygroundRequest($tournamentId)
+    {
+        header(self::JSON_HEADER);
+        $requestBody = file_get_contents("php://input");
+        $requestObject = json_decode($requestBody);
+
+        if (!isset($requestObject->playgroundUserId) || !isset($requestObject->initiatedBy)) {
+            http_response_code(400);
+            echo json_encode(["success" => false, "message" => "Missing required fields"]);
+            return;
+        }
+
+        $result = $this->tournamentService->sendPlaygroundRequest((int) $tournamentId, (int) $requestObject->playgroundUserId, $requestObject->initiatedBy);
+        echo json_encode($result);
+    }
+
+    public function respondToPlaygroundRequest($tournamentId)
+    {
+        header(self::JSON_HEADER);
+        $requestBody = file_get_contents("php://input");
+        $requestObject = json_decode($requestBody);
+
+        if (!isset($requestObject->playgroundUserId) || !isset($requestObject->status)) {
+            http_response_code(400);
+            echo json_encode(["success" => false, "message" => "Missing required fields"]);
+            return;
+        }
+
+        $result = $this->tournamentService->respondToPlaygroundRequest((int) $tournamentId, (int) $requestObject->playgroundUserId, $requestObject->status);
+        echo json_encode($result);
+    }
+
+    // Sponsor Requests
+    public function getSponsorRequests($tournamentId)
+    {
+        header(self::JSON_HEADER);
+        $result = $this->tournamentService->getSponsorRequests((int) $tournamentId);
+        echo json_encode($result);
+    }
+
+    public function sendSponsorRequest($tournamentId)
+    {
+        header(self::JSON_HEADER);
+        $requestBody = file_get_contents("php://input");
+        $requestObject = json_decode($requestBody);
+
+        if (!isset($requestObject->sponsorUserId) || !isset($requestObject->initiatedBy)) {
+            http_response_code(400);
+            echo json_encode(["success" => false, "message" => "Missing required fields"]);
+            return;
+        }
+
+        $result = $this->tournamentService->sendSponsorRequest((int) $tournamentId, (int) $requestObject->sponsorUserId, $requestObject->initiatedBy);
+        echo json_encode($result);
+    }
+
+    public function respondToSponsorRequest($tournamentId)
+    {
+        header(self::JSON_HEADER);
+        $requestBody = file_get_contents("php://input");
+        $requestObject = json_decode($requestBody);
+
+        if (!isset($requestObject->sponsorUserId) || !isset($requestObject->status)) {
+            http_response_code(400);
+            echo json_encode(["success" => false, "message" => "Missing required fields"]);
+            return;
+        }
+
+        $result = $this->tournamentService->respondToSponsorRequest((int) $tournamentId, (int) $requestObject->sponsorUserId, $requestObject->status);
+        echo json_encode($result);
+    }
+
+    public function getSponsorIncomingRequests($sponsorUserId)
+    {
+        header(self::JSON_HEADER);
+        $result = $this->tournamentService->getSponsorIncomingRequests((int) $sponsorUserId);
+        echo json_encode($result);
+    }
+
+    // Referee Requests
+    public function getRefereeRequests($tournamentId)
+    {
+        header(self::JSON_HEADER);
+        $result = $this->tournamentService->getRefereeRequests((int) $tournamentId);
+        echo json_encode($result);
+    }
+
+    public function sendRefereeRequest($tournamentId)
+    {
+        header(self::JSON_HEADER);
+        $requestBody = file_get_contents("php://input");
+        $requestObject = json_decode($requestBody);
+
+        if (!isset($requestObject->refereeUserId) || !isset($requestObject->initiatedBy)) {
+            http_response_code(400);
+            echo json_encode(["success" => false, "message" => "Missing required fields"]);
+            return;
+        }
+
+        $result = $this->tournamentService->sendRefereeRequest((int) $tournamentId, (int) $requestObject->refereeUserId, $requestObject->initiatedBy);
+        echo json_encode($result);
+    }
+
+    public function respondToRefereeRequest($tournamentId)
+    {
+        header(self::JSON_HEADER);
+        $requestBody = file_get_contents("php://input");
+        $requestObject = json_decode($requestBody);
+
+        if (!isset($requestObject->refereeUserId) || !isset($requestObject->status)) {
+            http_response_code(400);
+            echo json_encode(["success" => false, "message" => "Missing required fields"]);
+            return;
+        }
+
+        $result = $this->tournamentService->respondToRefereeRequest((int) $tournamentId, (int) $requestObject->refereeUserId, $requestObject->status);
+        echo json_encode($result);
+    }
+}
