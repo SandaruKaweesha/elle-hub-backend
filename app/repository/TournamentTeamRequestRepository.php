@@ -88,10 +88,10 @@ class TournamentTeamRequestRepository
     {
         $sql = "SELECT r.tournament_id, r.team_user_id, r.request_date, r.status, r.initiated_by,
                        t.title AS tournament_title,
-                       COALESCE(tm.team_name, u.display_name, u.full_name, 'Team') AS team_name,
-                       COALESCE(tm.contact_number, u.phone, 'N/A') AS contact_number,
+                       COALESCE(tm.team_name, 'Team') AS team_name,
+                       COALESCE(tm.contact_number, 'N/A') AS contact_number,
                        tm.rating,
-                       COALESCE(tm.district, u.district, 'N/A') AS district,
+                       COALESCE(tm.district, 'N/A') AS district,
                        (SELECT COUNT(*) FROM players WHERE team_user_id = r.team_user_id) AS squad_size
                 FROM tournament_team_requests r
                 JOIN tournaments t ON r.tournament_id = t.tournament_id
@@ -111,10 +111,10 @@ class TournamentTeamRequestRepository
     {
         $sql = "SELECT r.tournament_id, r.team_user_id, r.request_date, r.status, r.initiated_by,
                        t.title AS tournament_title,
-                       COALESCE(tm.team_name, u.display_name, u.full_name, 'Team') AS team_name,
-                       COALESCE(tm.contact_number, u.phone, 'N/A') AS contact_number,
+                       COALESCE(tm.team_name, 'Team') AS team_name,
+                       COALESCE(tm.contact_number, 'N/A') AS contact_number,
                        tm.rating,
-                       COALESCE(tm.district, u.district, 'N/A') AS district,
+                       COALESCE(tm.district, 'N/A') AS district,
                        (SELECT COUNT(*) FROM players WHERE team_user_id = r.team_user_id) AS squad_size
                 FROM tournament_team_requests r
                 JOIN tournaments t ON r.tournament_id = t.tournament_id

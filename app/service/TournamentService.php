@@ -453,9 +453,10 @@ class TournamentService{
         try {
             $conn = Database::getConnection();
             $stmt = $conn->prepare("
-                SELECT u.user_id, u.display_name, u.district, u.rating,
+                SELECT u.user_id, COALESCE(s.company_name, 'Sponsor') AS display_name, COALESCE(s.address, 'N/A') AS district,
                        tsr.status, tsr.initiated_by
                 FROM users u
+                LEFT JOIN sponsors s ON u.user_id = s.user_id
                 LEFT JOIN tournament_sponsor_requests tsr 
                        ON u.user_id = tsr.sponsor_user_id AND tsr.tournament_id = ?
                 WHERE u.role = 'SPONSOR' AND u.status = 'APPROVED'
@@ -529,7 +530,7 @@ class TournamentService{
     {
         try {
             $sql = "SELECT r.request_id, r.tournament_id, r.referee_user_id, r.request_date, r.status, r.initiated_by,
-                           u.display_name, u.phone, rf.rating, rf.experience_years
+                           COALESCE(rf.full_name, 'Referee') AS display_name, COALESCE(rf.contact_number, 'N/A') AS phone, rf.rating, rf.experience_years
                     FROM tournament_referee_requests r
                     JOIN users u ON r.referee_user_id = u.user_id
                     LEFT JOIN referees rf ON r.referee_user_id = rf.user_id
