@@ -189,3 +189,13 @@ $router->post(
     "/tournament/{id}/referee-requests/respond",
     [TournamentController::class, "respondToRefereeRequest"]
 );
+
+$router->post(
+    "/tournament/referee-request/cancel",
+    [TournamentController::class, "cancelRefereeRequest"]
+);
+
+$router->get(
+    "/referee/{id}/availability-calendar",
+    [TournamentController::class, "getRefereeAvailabilityCalendar"]
+);

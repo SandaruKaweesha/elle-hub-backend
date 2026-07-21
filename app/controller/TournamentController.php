@@ -372,4 +372,27 @@ class TournamentController{
         $result = $this->tournamentService->respondToRefereeRequest((int) $tournamentId, (int) $requestObject->refereeUserId, $requestObject->status);
         echo json_encode($result);
     }
+
+    public function cancelRefereeRequest()
+    {
+        header(self::JSON_HEADER);
+        $requestBody = file_get_contents("php://input");
+        $requestObject = json_decode($requestBody);
+
+        if (!isset($requestObject->tournamentId) || !isset($requestObject->refereeUserId)) {
+            http_response_code(400);
+            echo json_encode(["success" => false, "message" => "Missing tournamentId or refereeUserId"]);
+            return;
+        }
+
+        $result = $this->tournamentService->cancelRefereeRequest((int) $requestObject->tournamentId, (int) $requestObject->refereeUserId);
+        echo json_encode($result);
+    }
+
+    public function getRefereeAvailabilityCalendar($refereeUserId)
+    {
+        header(self::JSON_HEADER);
+        $result = $this->tournamentService->getRefereeAvailabilityCalendar((int) $refereeUserId);
+        echo json_encode($result);
+    }
 }

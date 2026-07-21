@@ -652,7 +652,93 @@ class TournamentService{
             $stmt = $conn->prepare("UPDATE tournament_referee_requests SET status = ? WHERE tournament_id = ? AND referee_user_id = ?");
             $stmt->execute([$dbStatus, $tournamentId, $refereeUserId]);
 
+            $isAssigned = ($dbStatus === 'ACCEPTED' || $dbStatus === 'APPROVED');
+            $this->syncRefereeAvailability($conn, $refereeUserId, $tournamentId, $isAssigned);
+
             return ["success" => true, "message" => "Referee request updated successfully"];
+        } catch (Exception $e) {
+            return ["success" => false, "message" => $e->getMessage()];
+        }
+    }
+
+    public function cancelRefereeRequest(int $tournamentId, int $refereeUserId): array
+    {
+        try {
+            $conn = Database::getConnection();
+            $stmt = $conn->prepare("UPDATE tournament_referee_requests SET status = 'CANCELLED' WHERE tournament_id = ? AND referee_user_id = ?");
+            $stmt->execute([$tournamentId, $refereeUserId]);
+
+            $this->syncRefereeAvailability($conn, $refereeUserId, $tournamentId, false);
+            return ["success" => true, "message" => "Officiating request cancelled successfully."];
+        } catch (Exception $e) {
+            return ["success" => false, "message" => $e->getMessage()];
+        }
+    }
+
+    private function syncRefereeAvailability(PDO $conn, int $refereeUserId, int $tournamentId, bool $isAssigned): void
+    {
+        try {
+            $stmt = $conn->prepare("SELECT tournament_held_date, start_date FROM tournaments WHERE tournament_id = ?");
+            $stmt->execute([$tournamentId]);
+            $t = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$t) return;
+            $date = !empty($t['tournament_held_date']) ? $t['tournament_held_date'] : $t['start_date'];
+            if (empty($date)) return;
+
+            if ($isAssigned) {
+                $stmtCheck = $conn->prepare("SELECT availability_id FROM referee_availability WHERE referee_user_id = ? AND available_date = ?");
+                $stmtCheck->execute([$refereeUserId, $date]);
+                $existing = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+
+                if ($existing) {
+                    $stmtUpdate = $conn->prepare("UPDATE referee_availability SET status = 'UNAVAILABLE' WHERE availability_id = ?");
+                    $stmtUpdate->execute([$existing['availability_id']]);
+                } else {
+                    $stmtInsert = $conn->prepare("INSERT INTO referee_availability (referee_user_id, available_date, start_time, end_time, status) VALUES (?, ?, '08:00:00', '18:00:00', 'UNAVAILABLE')");
+                    $stmtInsert->execute([$refereeUserId, $date]);
+                }
+            } else {
+                $stmtOther = $conn->prepare("SELECT COUNT(*) as total FROM tournament_referee_requests r JOIN tournaments t ON r.tournament_id = t.tournament_id WHERE r.referee_user_id = ? AND r.status IN ('ACCEPTED', 'APPROVED') AND (t.tournament_held_date = ? OR t.start_date = ?)");
+                $stmtOther->execute([$refereeUserId, $date, $date]);
+                $countRow = $stmtOther->fetch(PDO::FETCH_ASSOC);
+
+                if ((int)($countRow['total'] ?? 0) === 0) {
+                    $stmtDelete = $conn->prepare("UPDATE referee_availability SET status = 'AVAILABLE' WHERE referee_user_id = ? AND available_date = ?");
+                    $stmtDelete->execute([$refereeUserId, $date]);
+                }
+            }
+        } catch (Exception $e) {
+            error_log("syncRefereeAvailability error: " . $e->getMessage());
+        }
+    }
+
+    public function getRefereeAvailabilityCalendar(int $refereeUserId): array
+    {
+        try {
+            $conn = Database::getConnection();
+            
+            $stmt = $conn->prepare("SELECT availability_id, available_date, start_time, end_time, status FROM referee_availability WHERE referee_user_id = ?");
+            $stmt->execute([$refereeUserId]);
+            $explicit = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            $stmtT = $conn->prepare("
+                SELECT r.tournament_id, t.title AS tournament_title, t.location, 
+                       COALESCE(t.tournament_held_date, t.start_date) AS assigned_date
+                FROM tournament_referee_requests r
+                JOIN tournaments t ON r.tournament_id = t.tournament_id
+                WHERE r.referee_user_id = ? AND r.status IN ('ACCEPTED', 'APPROVED')
+            ");
+            $stmtT->execute([$refereeUserId]);
+            $assignedTournaments = $stmtT->fetchAll(PDO::FETCH_ASSOC);
+
+            return [
+                "success" => true,
+                "data" => [
+                    "availability" => $explicit,
+                    "assignedTournaments" => $assignedTournaments
+                ]
+            ];
         } catch (Exception $e) {
             return ["success" => false, "message" => $e->getMessage()];
         }
