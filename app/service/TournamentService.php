@@ -610,7 +610,8 @@ class TournamentService{
     public function getRefereeIncomingRequests(int $refereeUserId): array
     {
         try {
-            $sql = "SELECT r.request_id, r.tournament_id, r.referee_user_id, r.request_date, r.status, r.initiated_by,
+            $sql = "SELECT r.request_id, r.tournament_id, r.referee_user_id, r.request_date, r.status,
+                           COALESCE(r.initiated_by, 'REFEREE') AS initiated_by,
                            t.title AS tournament_title, t.location, t.start_date, t.end_date, t.tournament_held_date,
                            COALESCE(o.organization_name, 'Elle Sports Association') AS organizer_name,
                            COALESCE(o.contact_number, 'Available on Request') AS contact_number
