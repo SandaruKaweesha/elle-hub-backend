@@ -91,14 +91,20 @@ class TournamentRepository{
     public function findApprovedTournaments(string $search): array
     {
         if ($search === "") {
-            $sql = "SELECT * FROM tournaments WHERE approval_status = 'APPROVED'";
+            $sql = "SELECT t.*, o.organization_name, o.contact_number, o.address AS organizer_address 
+                    FROM tournaments t 
+                    LEFT JOIN organizers o ON t.organizer_id = o.user_id 
+                    WHERE t.approval_status = 'APPROVED'";
             $statement = $this->connection->prepare($sql);
             $statement->execute();
 
             return $statement->fetchAll(PDO::FETCH_ASSOC);
         }
 
-        $sql = "SELECT * FROM tournaments WHERE approval_status = 'APPROVED' AND title LIKE :search";
+        $sql = "SELECT t.*, o.organization_name, o.contact_number, o.address AS organizer_address 
+                FROM tournaments t 
+                LEFT JOIN organizers o ON t.organizer_id = o.user_id 
+                WHERE t.approval_status = 'APPROVED' AND t.title LIKE :search";
         $statement = $this->connection->prepare($sql);
         $statement->bindValue(":search", "%" . $search . "%");
         $statement->execute();
