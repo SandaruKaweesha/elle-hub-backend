@@ -1,4 +1,5 @@
 <?php
+
 class Database
 {
     private static ?PDO $connection = null;
@@ -7,16 +8,17 @@ class Database
     {
         if (self::$connection === null) {
 
-            $host = "ellehub-mysql.mysql.database.azure.com";
-            $database = "elle_hub";
-            $username = "ellehubadmin";
-            $password = "admin@4444";
+            // Local MySQL 8 connection
+            $host = "127.0.0.1";
+            $port = "3306";
+            $database = "ellehub"; // Change if your local DB has a different name
+            $username = "root";
+            $password = "1234";
 
-            $dsn = "mysql:host=$host;port=3306;dbname=$database;charset=utf8mb4";
+            $dsn = "mysql:host=$host;port=$port;dbname=$database;charset=utf8mb4";
 
             $options = [
-                PDO::MYSQL_ATTR_SSL_CA => __DIR__ . "/../certs/DigiCertGlobalRootG2.crt.pem",
-                PDO::ATTR_TIMEOUT => 15, // Increased timeout for Azure DB
+                PDO::ATTR_TIMEOUT => 15,
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES => false
@@ -30,22 +32,23 @@ class Database
                     $password,
                     $options
                 );
-
             } catch (PDOException $e) {
 
                 http_response_code(500);
                 header('Content-Type: application/json');
+
                 echo json_encode([
                     "success" => false,
                     "message" => "Database Connection Failed: " . $e->getMessage()
                 ]);
-                exit;
 
+                exit;
             }
         }
 
         return self::$connection;
     }
+
     public static function beginTransaction()
     {
         self::getConnection()->beginTransaction();

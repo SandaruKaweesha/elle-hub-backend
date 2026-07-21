@@ -23,6 +23,7 @@ class TournamentRepository{
             end_date,
             tournament_held_date,
             maximum_team_limit,
+            maximum_referee_limit,
             rules,
             prize_details,
             approval_status,
@@ -36,6 +37,7 @@ class TournamentRepository{
             :end_date,
             :tournament_held_date,
             :maximum_team_limit,
+            :maximum_referee_limit,
             :rules,
             :prize_details,
             :approval_status,
@@ -52,6 +54,7 @@ class TournamentRepository{
         $statement->bindValue(":end_date", $tournament->getEndDate());
         $statement->bindValue(":tournament_held_date", $tournament->getTournamentHeldDate());
         $statement->bindValue(":maximum_team_limit", $tournament->getMaximumTeamLimit(), PDO::PARAM_INT);
+        $statement->bindValue(":maximum_referee_limit", $tournament->getMaximumRefereeLimit() ?? 2, PDO::PARAM_INT);
         $statement->bindValue(":rules", $tournament->getRules());
         $statement->bindValue(":prize_details", $tournament->getPrizeDetails());
         $statement->bindValue(":approval_status", $tournament->getApprovalStatus());
@@ -88,14 +91,20 @@ class TournamentRepository{
     public function findApprovedTournaments(string $search): array
     {
         if ($search === "") {
-            $sql = "SELECT * FROM tournaments WHERE approval_status = 'APPROVED'";
+            $sql = "SELECT t.*, o.organization_name, o.contact_number, o.address AS organizer_address 
+                    FROM tournaments t 
+                    LEFT JOIN organizers o ON t.organizer_id = o.user_id 
+                    WHERE t.approval_status = 'APPROVED'";
             $statement = $this->connection->prepare($sql);
             $statement->execute();
 
             return $statement->fetchAll(PDO::FETCH_ASSOC);
         }
 
-        $sql = "SELECT * FROM tournaments WHERE approval_status = 'APPROVED' AND title LIKE :search";
+        $sql = "SELECT t.*, o.organization_name, o.contact_number, o.address AS organizer_address 
+                FROM tournaments t 
+                LEFT JOIN organizers o ON t.organizer_id = o.user_id 
+                WHERE t.approval_status = 'APPROVED' AND t.title LIKE :search";
         $statement = $this->connection->prepare($sql);
         $statement->bindValue(":search", "%" . $search . "%");
         $statement->execute();

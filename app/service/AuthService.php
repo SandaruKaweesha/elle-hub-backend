@@ -47,6 +47,8 @@ class AuthService
             "token" => $token,
             "user" => [
                 "userId" => $user->getUserId(),
+                "user_id" => $user->getUserId(),
+                "id" => $user->getUserId(),
                 "email" => $user->getEmail(),
                 "role" => $user->getRole(),
                 "status" => $user->getStatus()
