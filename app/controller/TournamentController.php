@@ -320,6 +320,13 @@ class TournamentController{
     }
 
     // Referee Requests
+    public function getOrganizerRefereeRequests($organizerId)
+    {
+        header(self::JSON_HEADER);
+        $result = $this->tournamentService->getOrganizerRefereeRequests((int) $organizerId);
+        echo json_encode($result);
+    }
+
     public function getRefereeRequests($tournamentId)
     {
         header(self::JSON_HEADER);

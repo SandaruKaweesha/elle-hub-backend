@@ -166,6 +166,11 @@ $router->get(
 
 // Advanced Referee Request System
 $router->get(
+    "/organizer/{id}/referee-requests",
+    [TournamentController::class, "getOrganizerRefereeRequests"]
+);
+
+$router->get(
     "/tournament/{id}/referee-requests",
     [TournamentController::class, "getRefereeRequests"]
 );

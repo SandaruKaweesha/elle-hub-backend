@@ -549,6 +549,19 @@ class TournamentService{
         try {
             $conn = Database::getConnection();
 
+            // Check if request already exists to prevent duplicate entry exception
+            $stmtCheck = $conn->prepare("SELECT status FROM tournament_referee_requests WHERE tournament_id = ? AND referee_user_id = ?");
+            $stmtCheck->execute([$tournamentId, $refereeUserId]);
+            $existing = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+
+            if ($existing) {
+                $statusText = strtoupper($existing['status']);
+                if ($statusText === 'ACCEPTED' || $statusText === 'APPROVED') {
+                    return ["success" => true, "message" => "You are already a confirmed referee for this tournament."];
+                }
+                return ["success" => true, "message" => "Your officiating request is already submitted and pending organizer review."];
+            }
+
             // Check maximum referee limit
             $stmtLimit = $conn->prepare("SELECT maximum_referee_limit FROM tournaments WHERE tournament_id = ?");
             $stmtLimit->execute([$tournamentId]);
@@ -567,6 +580,28 @@ class TournamentService{
             $stmt = $conn->prepare("INSERT INTO tournament_referee_requests (tournament_id, referee_user_id, status, request_date, initiated_by) VALUES (?, ?, 'PENDING', NOW(), ?)");
             $stmt->execute([$tournamentId, $refereeUserId, $initiatedBy]);
             return ["success" => true, "message" => "Referee request submitted successfully"];
+        } catch (Exception $e) {
+            return ["success" => false, "message" => $e->getMessage()];
+        }
+    }
+
+    public function getOrganizerRefereeRequests(int $organizerId): array
+    {
+        try {
+            $sql = "SELECT r.request_id, r.tournament_id, r.referee_user_id, r.request_date, r.status, r.initiated_by,
+                           t.title AS tournament_title,
+                           COALESCE(rf.full_name, 'Official Referee') AS display_name,
+                           COALESCE(rf.contact_number, u.email, 'N/A') AS contact_number,
+                           rf.rating, rf.experience_years
+                    FROM tournament_referee_requests r
+                    JOIN tournaments t ON r.tournament_id = t.tournament_id
+                    JOIN users u ON r.referee_user_id = u.user_id
+                    LEFT JOIN referees rf ON r.referee_user_id = rf.user_id
+                    WHERE t.organizer_id = ?
+                    ORDER BY r.request_date DESC";
+            $stmt = Database::getConnection()->prepare($sql);
+            $stmt->execute([$organizerId]);
+            return ["success" => true, "data" => $stmt->fetchAll(PDO::FETCH_ASSOC)];
         } catch (Exception $e) {
             return ["success" => false, "message" => $e->getMessage()];
         }
