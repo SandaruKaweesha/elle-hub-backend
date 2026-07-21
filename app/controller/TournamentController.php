@@ -395,4 +395,27 @@ class TournamentController{
         $result = $this->tournamentService->getRefereeAvailabilityCalendar((int) $refereeUserId);
         echo json_encode($result);
     }
+
+    public function getRefereeOfficiatingHistory($refereeUserId)
+    {
+        header(self::JSON_HEADER);
+        $result = $this->tournamentService->getRefereeOfficiatingHistory((int) $refereeUserId);
+        echo json_encode($result);
+    }
+
+    public function saveRefereeAvailability()
+    {
+        header(self::JSON_HEADER);
+        $requestBody = file_get_contents("php://input");
+        $requestObject = json_decode($requestBody);
+
+        if (!isset($requestObject->refereeUserId) || !isset($requestObject->availableDate) || !isset($requestObject->status)) {
+            http_response_code(400);
+            echo json_encode(["success" => false, "message" => "Missing refereeUserId, availableDate, or status"]);
+            return;
+        }
+
+        $result = $this->tournamentService->saveRefereeAvailability((int) $requestObject->refereeUserId, $requestObject->availableDate, $requestObject->status);
+        echo json_encode($result);
+    }
 }

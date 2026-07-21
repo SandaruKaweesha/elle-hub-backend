@@ -118,11 +118,15 @@ class TournamentService{
             ->updateStatus($tournamentId, $status);
 
         if (!$updated) {
-
             return [
                 "success" => false,
                 "message" => "Failed to update tournament status."
             ];
+        }
+
+        // Recalculate referee rating if status updated to COMPLETED
+        if (strtoupper($status) === 'COMPLETED') {
+            $this->recalculateRefereesRatingForTournament($tournamentId);
         }
 
         return [
@@ -742,6 +746,111 @@ class TournamentService{
             ];
         } catch (Exception $e) {
             return ["success" => false, "message" => $e->getMessage()];
+        }
+    }
+
+    public function getRefereeOfficiatingHistory(int $refereeUserId): array
+    {
+        try {
+            $conn = Database::getConnection();
+            $sql = "SELECT r.request_id, r.tournament_id, r.referee_user_id, r.request_date, r.status AS request_status,
+                           t.title AS tournament_title, t.location, t.start_date, t.end_date, t.tournament_held_date, t.status AS tournament_status,
+                           COALESCE(o.organization_name, 'Elle Sports Association') AS organizer_name,
+                           COALESCE(o.contact_number, 'N/A') AS contact_number
+                    FROM tournament_referee_requests r
+                    JOIN tournaments t ON r.tournament_id = t.tournament_id
+                    LEFT JOIN organizers o ON t.organizer_id = o.user_id
+                    WHERE r.referee_user_id = ?
+                      AND r.status IN ('ACCEPTED', 'APPROVED')
+                      AND UPPER(t.status) = 'COMPLETED'
+                    ORDER BY COALESCE(t.tournament_held_date, t.start_date, r.request_date) DESC";
+            $stmt = $conn->prepare($sql);
+            $stmt->execute([$refereeUserId]);
+            return ["success" => true, "data" => $stmt->fetchAll(PDO::FETCH_ASSOC)];
+        } catch (Exception $e) {
+            return ["success" => false, "message" => $e->getMessage()];
+        }
+    }
+
+    public function saveRefereeAvailability(int $refereeUserId, string $availableDate, string $status): array
+    {
+        try {
+            $conn = Database::getConnection();
+            $dbStatus = (strtoupper($status) === 'UNAVAILABLE') ? 'UNAVAILABLE' : 'AVAILABLE';
+
+            $stmtCheck = $conn->prepare("SELECT availability_id FROM referee_availability WHERE referee_user_id = ? AND available_date = ?");
+            $stmtCheck->execute([$refereeUserId, $availableDate]);
+            $existing = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+
+            if ($existing) {
+                $stmtUpdate = $conn->prepare("UPDATE referee_availability SET status = ? WHERE availability_id = ?");
+                $stmtUpdate->execute([$dbStatus, $existing['availability_id']]);
+            } else {
+                $stmtInsert = $conn->prepare("INSERT INTO referee_availability (referee_user_id, available_date, start_time, end_time, status) VALUES (?, ?, '08:00:00', '18:00:00', ?)");
+                $stmtInsert->execute([$refereeUserId, $availableDate, $dbStatus]);
+            }
+
+            return ["success" => true, "message" => "Availability for date {$availableDate} updated to {$dbStatus}."];
+        } catch (Exception $e) {
+            return ["success" => false, "message" => $e->getMessage()];
+        }
+    }
+
+    public function recalculateRefereesRatingForTournament(int $tournamentId): void
+    {
+        try {
+            $conn = Database::getConnection();
+            $stmt = $conn->prepare("SELECT DISTINCT referee_user_id FROM tournament_referee_requests WHERE tournament_id = ? AND status IN ('ACCEPTED', 'APPROVED')");
+            $stmt->execute([$tournamentId]);
+            $referees = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($referees as $ref) {
+                $refereeId = (int) $ref['referee_user_id'];
+                $this->recalculateRefereeRating($refereeId);
+            }
+        } catch (Exception $e) {
+            // Silently ignore or log error
+        }
+    }
+
+    public function recalculateRefereeRating(int $refereeUserId): float
+    {
+        try {
+            $conn = Database::getConnection();
+            
+            // Count completed tournaments officiated by this referee
+            $sql = "SELECT COUNT(DISTINCT r.tournament_id) AS completed_count
+                    FROM tournament_referee_requests r
+                    JOIN tournaments t ON r.tournament_id = t.tournament_id
+                    WHERE r.referee_user_id = ?
+                      AND r.status IN ('ACCEPTED', 'APPROVED')
+                      AND UPPER(t.status) = 'COMPLETED'";
+            $stmt = $conn->prepare($sql);
+            $stmt->execute([$refereeUserId]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            $completedCount = (int) ($row['completed_count'] ?? 0);
+
+            // Calculation Formula:
+            // Base Rating: 5.0 (out of 10.0 max)
+            // Each completed tournament officiated adds +0.5 points
+            // Maximum cap: 10.0
+            $rating = 5.0 + ($completedCount * 0.5);
+            if ($rating > 10.0) {
+                $rating = 10.0;
+            }
+            $rating = round($rating, 1);
+
+            // Update in referees table
+            $stmtRef = $conn->prepare("UPDATE referees SET referee_rating = ? WHERE user_id = ?");
+            $stmtRef->execute([$rating, $refereeUserId]);
+
+            // Update in users table if column exists
+            $stmtUsers = $conn->prepare("UPDATE users SET referee_rating = ? WHERE user_id = ?");
+            $stmtUsers->execute([$rating, $refereeUserId]);
+
+            return $rating;
+        } catch (Exception $e) {
+            return 5.0;
         }
     }
 }

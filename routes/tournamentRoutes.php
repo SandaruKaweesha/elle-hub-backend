@@ -199,3 +199,13 @@ $router->get(
     "/referee/{id}/availability-calendar",
     [TournamentController::class, "getRefereeAvailabilityCalendar"]
 );
+
+$router->get(
+    "/referee/{id}/history",
+    [TournamentController::class, "getRefereeOfficiatingHistory"]
+);
+
+$router->post(
+    "/referee/availability/save",
+    [TournamentController::class, "saveRefereeAvailability"]
+);
