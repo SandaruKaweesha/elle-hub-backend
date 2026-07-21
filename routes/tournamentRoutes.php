@@ -84,6 +84,8 @@ $router->post(
 $router->get(
     "/tournaments/{id}/results",
     [TournamentResultController::class, "getResults"]
+);
+
 $router->get(
     "/organizer/{id}/team-requests",
     [TournamentTeamRequestController::class, "getOrganizerTeamRequests"]
