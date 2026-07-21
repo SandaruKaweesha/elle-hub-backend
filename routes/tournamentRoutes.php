@@ -2,6 +2,7 @@
 
 require_once __DIR__ . "/../app/controller/TournamentController.php";
 require_once __DIR__ . "/../app/controller/TournamentTeamRequestController.php";
+require_once __DIR__ . "/../app/controller/TournamentResultController.php";
 
 $router->post(
     "/organizer/tournament/create",
@@ -74,6 +75,15 @@ $router->post(
     [TournamentTeamRequestController::class, "leaveTournament"]
 );
 
+// Tournament Results (Final Awards)
+$router->post(
+    "/tournaments/{id}/results",
+    [TournamentResultController::class, "saveResults"]
+);
+
+$router->get(
+    "/tournaments/{id}/results",
+    [TournamentResultController::class, "getResults"]
 $router->get(
     "/organizer/{id}/team-requests",
     [TournamentTeamRequestController::class, "getOrganizerTeamRequests"]
