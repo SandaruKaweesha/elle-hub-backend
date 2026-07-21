@@ -607,6 +607,26 @@ class TournamentService{
         }
     }
 
+    public function getRefereeIncomingRequests(int $refereeUserId): array
+    {
+        try {
+            $sql = "SELECT r.request_id, r.tournament_id, r.referee_user_id, r.request_date, r.status, r.initiated_by,
+                           t.title AS tournament_title, t.location, t.start_date, t.end_date, t.tournament_held_date,
+                           COALESCE(o.organization_name, 'Elle Sports Association') AS organizer_name,
+                           COALESCE(o.contact_number, 'Available on Request') AS contact_number
+                    FROM tournament_referee_requests r
+                    JOIN tournaments t ON r.tournament_id = t.tournament_id
+                    LEFT JOIN organizers o ON t.organizer_id = o.user_id
+                    WHERE r.referee_user_id = ?
+                    ORDER BY r.request_date DESC";
+            $stmt = Database::getConnection()->prepare($sql);
+            $stmt->execute([$refereeUserId]);
+            return ["success" => true, "data" => $stmt->fetchAll(PDO::FETCH_ASSOC)];
+        } catch (Exception $e) {
+            return ["success" => false, "message" => $e->getMessage()];
+        }
+    }
+
     public function respondToRefereeRequest(int $tournamentId, int $refereeUserId, string $status): array
     {
         try {
