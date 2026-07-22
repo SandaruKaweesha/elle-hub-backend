@@ -272,6 +272,29 @@ class TournamentController{
         echo json_encode($result);
     }
 
+    public function getPlaygroundIncomingRequests($playgroundUserId)
+    {
+        header(self::JSON_HEADER);
+        $result = $this->tournamentService->getPlaygroundIncomingRequests((int) $playgroundUserId);
+        echo json_encode($result);
+    }
+
+    public function cancelPlaygroundRequest()
+    {
+        header(self::JSON_HEADER);
+        $requestBody = file_get_contents("php://input");
+        $requestObject = json_decode($requestBody);
+
+        if (!isset($requestObject->tournamentId) || !isset($requestObject->playgroundUserId)) {
+            http_response_code(400);
+            echo json_encode(["success" => false, "message" => "Missing tournamentId or playgroundUserId"]);
+            return;
+        }
+
+        $result = $this->tournamentService->cancelPlaygroundRequest((int) $requestObject->tournamentId, (int) $requestObject->playgroundUserId);
+        echo json_encode($result);
+    }
+
     // Sponsor Requests
     public function getSponsorRequests($tournamentId)
     {
@@ -416,6 +439,29 @@ class TournamentController{
         }
 
         $result = $this->tournamentService->saveRefereeAvailability((int) $requestObject->refereeUserId, $requestObject->availableDate, $requestObject->status);
+        echo json_encode($result);
+    }
+
+    public function getPlaygroundAvailabilityCalendar($playgroundUserId)
+    {
+        header(self::JSON_HEADER);
+        $result = $this->tournamentService->getPlaygroundAvailabilityCalendar((int) $playgroundUserId);
+        echo json_encode($result);
+    }
+
+    public function savePlaygroundAvailability()
+    {
+        header(self::JSON_HEADER);
+        $requestBody = file_get_contents("php://input");
+        $requestObject = json_decode($requestBody);
+
+        if (!isset($requestObject->playgroundUserId) || !isset($requestObject->availableDate) || !isset($requestObject->status)) {
+            http_response_code(400);
+            echo json_encode(["success" => false, "message" => "Missing playgroundUserId, availableDate, or status"]);
+            return;
+        }
+
+        $result = $this->tournamentService->savePlaygroundAvailability((int) $requestObject->playgroundUserId, $requestObject->availableDate, $requestObject->status);
         echo json_encode($result);
     }
 }
