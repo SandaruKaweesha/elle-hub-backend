@@ -464,4 +464,11 @@ class TournamentController{
         $result = $this->tournamentService->savePlaygroundAvailability((int) $requestObject->playgroundUserId, $requestObject->availableDate, $requestObject->status);
         echo json_encode($result);
     }
+
+    public function getPlaygroundHostingHistory($playgroundUserId)
+    {
+        header(self::JSON_HEADER);
+        $result = $this->tournamentService->getPlaygroundHostingHistory((int) $playgroundUserId);
+        echo json_encode($result);
+    }
 }

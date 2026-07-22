@@ -68,7 +68,7 @@ class UserRepository{
                        t.team_name, t.rating, t.district,
                        o.organization_name,
                        s.company_name, s.contact_person AS sponsor_contact_person, s.address AS sponsor_address,
-                       p.playground_name, p.located_district, p.location AS playground_location, p.address AS playground_address, p.capacity AS playground_capacity,
+                       p.playground_name, p.located_district, p.location AS playground_location, p.address AS playground_address, p.area AS playground_area, p.area AS area, p.capacity AS capacity,
                        r.full_name AS referee_name, r.experience_years, r.rating AS referee_rating, r.availability_status AS referee_availability_status,
                        COALESCE(t.contact_number, o.contact_number, s.contact_number, p.contact_number, r.contact_number) AS contact_number,
                        COALESCE(t.district, p.located_district, 'Sri Lanka') AS district
@@ -287,7 +287,7 @@ class UserRepository{
                             location = :location,
                             address = :address, 
                             contact_number = :contact_number,
-                            capacity = :capacity
+                            area = :area
                         WHERE user_id = :user_id";
                 $statement = $this->connection->prepare($sql);
                 $statement->bindValue(':playground_name', $data['playgroundName'] ?? $data['playground_name'] ?? null);
@@ -295,7 +295,7 @@ class UserRepository{
                 $statement->bindValue(':location', $data['location'] ?? null);
                 $statement->bindValue(':address', $data['address'] ?? null);
                 $statement->bindValue(':contact_number', $data['contactNumber'] ?? $data['contact_number'] ?? null);
-                $statement->bindValue(':capacity', $data['capacity'] ?? null);
+                $statement->bindValue(':area', $data['area'] ?? $data['capacity'] ?? null);
                 $statement->bindValue(':user_id', $userId, PDO::PARAM_INT);
                 $statement->execute();
                 return true;

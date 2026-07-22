@@ -401,7 +401,7 @@ class TournamentService{
         try {
             $conn = Database::getConnection();
             $stmt = $conn->prepare("
-                SELECT p.user_id, p.playground_name, p.located_district, p.location, p.capacity,
+                SELECT p.user_id, p.playground_name, p.located_district, p.location, p.area, p.area AS capacity,
                        tpr.status, tpr.initiated_by
                 FROM playgrounds p
                 LEFT JOIN tournament_playground_requests tpr 
@@ -440,12 +440,36 @@ class TournamentService{
     {
         try {
             $conn = Database::getConnection();
-            
-            // Note: The schema has ACCEPTED, not APPROVED. We use the incoming status exactly.
-            $stmt = $conn->prepare("UPDATE tournament_playground_requests SET status = ? WHERE tournament_id = ? AND playground_user_id = ?");
-            $stmt->execute([$status, $tournamentId, $playgroundUserId]);
+            $upperStatus = strtoupper($status);
+            $dbStatus = ($upperStatus === 'APPROVED' || $upperStatus === 'ACCEPTED') ? 'ACCEPTED' : $upperStatus;
 
-            return ["success" => true, "message" => "Request updated successfully"];
+            $stmt = $conn->prepare("UPDATE tournament_playground_requests SET status = ? WHERE tournament_id = ? AND playground_user_id = ?");
+            $stmt->execute([$dbStatus, $tournamentId, $playgroundUserId]);
+
+            if ($dbStatus === 'ACCEPTED' || $dbStatus === 'APPROVED') {
+                // Fetch tournament date
+                $stmtT = $conn->prepare("SELECT COALESCE(tournament_held_date, start_date) AS t_date FROM tournaments WHERE tournament_id = ?");
+                $stmtT->execute([$tournamentId]);
+                $tRow = $stmtT->fetch(PDO::FETCH_ASSOC);
+                $tDate = $tRow['t_date'] ?? null;
+
+                if ($tDate) {
+                    // Update playground_availability to UNAVAILABLE for that date
+                    $stmtCheck = $conn->prepare("SELECT availability_id FROM playground_availability WHERE playground_user_id = ? AND available_date = ?");
+                    $stmtCheck->execute([$playgroundUserId, $tDate]);
+                    $existing = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+
+                    if ($existing) {
+                        $stmtUpd = $conn->prepare("UPDATE playground_availability SET status = 'UNAVAILABLE' WHERE availability_id = ?");
+                        $stmtUpd->execute([$existing['availability_id']]);
+                    } else {
+                        $stmtIns = $conn->prepare("INSERT INTO playground_availability (playground_user_id, available_date, start_time, end_time, status) VALUES (?, ?, '08:00:00', '18:00:00', 'UNAVAILABLE')");
+                        $stmtIns->execute([$playgroundUserId, $tDate]);
+                    }
+                }
+            }
+
+            return ["success" => true, "message" => "Request updated successfully to {$dbStatus}."];
         } catch (Exception $e) {
             return ["success" => false, "message" => $e->getMessage()];
         }
@@ -802,6 +826,29 @@ class TournamentService{
                     ORDER BY COALESCE(t.tournament_held_date, t.start_date, r.request_date) DESC";
             $stmt = $conn->prepare($sql);
             $stmt->execute([$refereeUserId]);
+            return ["success" => true, "data" => $stmt->fetchAll(PDO::FETCH_ASSOC)];
+        } catch (Exception $e) {
+            return ["success" => false, "message" => $e->getMessage()];
+        }
+    }
+
+    public function getPlaygroundHostingHistory(int $playgroundUserId): array
+    {
+        try {
+            $conn = Database::getConnection();
+            $sql = "SELECT r.request_id, r.tournament_id, r.playground_user_id, r.request_date, r.status AS request_status,
+                           t.title AS tournament_title, t.location, t.start_date, t.end_date, t.tournament_held_date, t.status AS tournament_status,
+                           COALESCE(o.organization_name, 'Elle Sports Association') AS organizer_name,
+                           COALESCE(o.contact_number, 'N/A') AS contact_number
+                    FROM tournament_playground_requests r
+                    JOIN tournaments t ON r.tournament_id = t.tournament_id
+                    LEFT JOIN organizers o ON t.organizer_id = o.user_id
+                    WHERE r.playground_user_id = ?
+                      AND r.status IN ('ACCEPTED', 'APPROVED')
+                      AND UPPER(t.status) = 'COMPLETED'
+                    ORDER BY COALESCE(t.tournament_held_date, t.start_date, r.request_date) DESC";
+            $stmt = $conn->prepare($sql);
+            $stmt->execute([$playgroundUserId]);
             return ["success" => true, "data" => $stmt->fetchAll(PDO::FETCH_ASSOC)];
         } catch (Exception $e) {
             return ["success" => false, "message" => $e->getMessage()];

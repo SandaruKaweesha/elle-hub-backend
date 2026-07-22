@@ -9,7 +9,7 @@ class Playground extends User
     private $location;
     private $address;
     private $contactNumber;
-    private $capacity;
+    private $area;
 
     // Constructor
     public function __construct(
@@ -27,7 +27,7 @@ class Playground extends User
         $location = null,
         $address = null,
         $contactNumber = null,
-        $capacity = null
+        $area = null
     )
     {
 
@@ -48,7 +48,7 @@ class Playground extends User
         $this->location = $location;
         $this->address = $address;
         $this->contactNumber = $contactNumber;
-        $this->capacity = $capacity;
+        $this->area = $area;
     }
 
     // Getters
@@ -73,9 +73,9 @@ class Playground extends User
         return $this->contactNumber;
     }
 
-    public function getCapacity()
+    public function getArea()
     {
-        return $this->capacity;
+        return $this->area;
     }
 
     // Setters
@@ -100,8 +100,8 @@ class Playground extends User
         $this->contactNumber = $contactNumber;
     }
 
-    public function setCapacity($capacity)
+    public function setArea($area)
     {
-        $this->capacity = $capacity;
+        $this->area = $area;
     }
 }

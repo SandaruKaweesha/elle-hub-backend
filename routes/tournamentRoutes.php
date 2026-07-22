@@ -229,3 +229,8 @@ $router->post(
     "/playground/availability/save",
     [TournamentController::class, "savePlaygroundAvailability"]
 );
+
+$router->get(
+    "/playground/{id}/history",
+    [TournamentController::class, "getPlaygroundHostingHistory"]
+);

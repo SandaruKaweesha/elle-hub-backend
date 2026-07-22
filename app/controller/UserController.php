@@ -54,7 +54,7 @@ class UserController{
                 $user->setLocation($requestObject->location);
                 $user->setAddress($requestObject->address);
                 $user->setContactNumber($requestObject->contactNumber);
-                $user->setCapacity($requestObject->capacity);
+                $user->setArea($requestObject->area ?? $requestObject->capacity ?? '500 Sq. Ft');
                 break;
 
             case "REFEREE":
