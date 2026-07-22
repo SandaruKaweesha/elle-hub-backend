@@ -234,3 +234,18 @@ $router->get(
     "/playground/{id}/history",
     [TournamentController::class, "getPlaygroundHostingHistory"]
 );
+
+$router->get(
+    "/sponsor/{id}/requests",
+    [TournamentController::class, "getSponsorIncomingRequests"]
+);
+
+$router->post(
+    "/tournament/{id}/sponsor-requests/respond",
+    [TournamentController::class, "respondToSponsorRequest"]
+);
+
+$router->get(
+    "/sponsor/{id}/history",
+    [TournamentController::class, "getSponsorHistory"]
+);

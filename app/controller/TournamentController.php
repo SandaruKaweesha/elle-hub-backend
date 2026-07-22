@@ -18,8 +18,6 @@ class TournamentController{
 
         $tournament = new Tournament();
 
-        // NOTE: organizerId should later be obtained from the authenticated JWT token.
-        // For now (temporary) we accept organizerId from the request body as provided.
         $tournament->setOrganizerId($requestObject->organizerId ?? null);
         $tournament->setTitle($requestObject->title ?? null);
         $tournament->setDescription($requestObject->description ?? null);
@@ -44,41 +42,32 @@ class TournamentController{
         echo json_encode($result);
     }
 
-
-//    In here We are geting the Pending tournaments that show insdie of the Admin Side
     public function getPendingTournaments()
     {
         $result = $this->tournamentService->getPendingTournaments();
-
         header(self::JSON_HEADER);
         echo json_encode($result);
     }
 
-//    Search by Name Only get the Approved Tournaments that show inside of the Admin Side
     public function getApprovedTournaments()
     {
         $search = $_GET["search"] ?? "";
-
         $result = $this->tournamentService->getApprovedTournaments($search);
-
         header(self::JSON_HEADER);
         echo json_encode($result);
     }
 
-//    Update the Status By the Organizer
     public function updateTournamentStatus($tournamentId)
     {
         $requestBody = file_get_contents("php://input");
         $request = json_decode($requestBody);
 
         if (!isset($request->status)) {
-
             echo json_encode([
                 "success" => false,
                 "message" => "Tournament status is required."
             ]);
-
-            return ;
+            return;
         }
 
         $result = $this->tournamentService->updateTournamentStatus(
@@ -87,17 +76,12 @@ class TournamentController{
         );
 
         header(self::JSON_HEADER);
-
         echo json_encode($result);
     }
 
-
-
-//    Update the Approval Status By the Admin
     public function updateApprovalStatus($tournamentId)
     {
         header("Content-Type: application/json");
-
         $requestBody = file_get_contents("php://input");
         $requestObject = json_decode($requestBody);
 
@@ -106,12 +90,10 @@ class TournamentController{
             !isset($requestObject->adminId)
         ) {
             http_response_code(400);
-
             echo json_encode([
                 "success" => false,
                 "message" => "Approval status and Admin ID are required."
             ]);
-
             return;
         }
 
@@ -124,55 +106,43 @@ class TournamentController{
         echo json_encode($result);
     }
 
-//    Filter by the Status
     public function filterTournamentsByStatus()
     {
         header("Content-Type: application/json");
-
         $status = $_GET["status"] ?? null;
 
         if ($status === null) {
             http_response_code(400);
-
             echo json_encode([
                 "success" => false,
                 "message" => "Tournament status is required."
             ]);
-
             return;
         }
 
         $result = $this->tournamentService->filterTournamentsByStatus(strtoupper($status));
-
         echo json_encode($result);
     }
 
-//    Get Tournament by ID (aslo Searching we can do)
     public function getTournamentById($tournamentId)
     {
         header("Content-Type: application/json");
-
         $result = $this->tournamentService->getTournamentById((int) $tournamentId);
-
         echo json_encode($result);
     }
 
-//    Update the tournament Details
     public function updateTournament($tournamentId)
     {
         header("Content-Type: application/json");
-
         $requestBody = file_get_contents("php://input");
         $requestObject = json_decode($requestBody);
 
         if ($requestObject === null) {
             http_response_code(400);
-
             echo json_encode([
                 "success" => false,
                 "message" => "Invalid JSON request body."
             ]);
-
             return;
         }
 
@@ -184,14 +154,10 @@ class TournamentController{
         echo json_encode($result);
     }
 
-//    Organizer's own tournaments
     public function getOrganizerTournaments($organizerId)
     {
         header("Content-Type: application/json");
-
-        $result = $this->tournamentService
-            ->getOrganizerTournaments((int) $organizerId);
-
+        $result = $this->tournamentService->getOrganizerTournaments((int) $organizerId);
         echo json_encode($result);
     }
 
@@ -233,6 +199,7 @@ class TournamentController{
         echo json_encode($result);
     }
 
+    // Playground Requests
     public function getPlaygroundRequests($tournamentId)
     {
         header(self::JSON_HEADER);
@@ -335,6 +302,25 @@ class TournamentController{
         echo json_encode($result);
     }
 
+    public function cancelSponsorRequest()
+    {
+        header(self::JSON_HEADER);
+        $requestBody = file_get_contents("php://input");
+        $requestObject = json_decode($requestBody);
+
+        $tournamentId = $requestObject->tournamentId ?? $requestObject->tournament_id ?? 0;
+        $sponsorUserId = $requestObject->sponsorUserId ?? $requestObject->sponsor_user_id ?? 0;
+
+        if (!$tournamentId || !$sponsorUserId) {
+            http_response_code(400);
+            echo json_encode(["success" => false, "message" => "Missing required fields"]);
+            return;
+        }
+
+        $result = $this->tournamentService->respondToSponsorRequest((int) $tournamentId, (int) $sponsorUserId, 'CANCELLED');
+        echo json_encode($result);
+    }
+
     public function getSponsorIncomingRequests($sponsorUserId)
     {
         header(self::JSON_HEADER);
@@ -412,20 +398,6 @@ class TournamentController{
         echo json_encode($result);
     }
 
-    public function getRefereeAvailabilityCalendar($refereeUserId)
-    {
-        header(self::JSON_HEADER);
-        $result = $this->tournamentService->getRefereeAvailabilityCalendar((int) $refereeUserId);
-        echo json_encode($result);
-    }
-
-    public function getRefereeOfficiatingHistory($refereeUserId)
-    {
-        header(self::JSON_HEADER);
-        $result = $this->tournamentService->getRefereeOfficiatingHistory((int) $refereeUserId);
-        echo json_encode($result);
-    }
-
     public function saveRefereeAvailability()
     {
         header(self::JSON_HEADER);
@@ -468,7 +440,14 @@ class TournamentController{
     public function getPlaygroundHostingHistory($playgroundUserId)
     {
         header(self::JSON_HEADER);
-        $result = $this->tournamentService->getPlaygroundHostingHistory((int) $playgroundUserId);
+        $result = $this->tournamentService->getPlaygroundHistory((int) $playgroundUserId);
+        echo json_encode($result);
+    }
+
+    public function getSponsorHistory($sponsorUserId)
+    {
+        header(self::JSON_HEADER);
+        $result = $this->tournamentService->getSponsorHistory((int) $sponsorUserId);
         echo json_encode($result);
     }
 }

@@ -559,6 +559,12 @@ class TournamentService{
         try {
             $conn = Database::getConnection();
             
+            if (strtoupper($status) === 'CANCELLED' || strtoupper($status) === 'DELETE') {
+                $stmt = $conn->prepare("DELETE FROM tournament_sponsor_requests WHERE tournament_id = ? AND sponsor_user_id = ?");
+                $stmt->execute([$tournamentId, $sponsorUserId]);
+                return ["success" => true, "message" => "Sponsorship request cancelled and removed successfully"];
+            }
+
             $stmt = $conn->prepare("UPDATE tournament_sponsor_requests SET status = ? WHERE tournament_id = ? AND sponsor_user_id = ?");
             $stmt->execute([$status, $tournamentId, $sponsorUserId]);
 
@@ -573,17 +579,44 @@ class TournamentService{
         try {
             $conn = Database::getConnection();
             $stmt = $conn->prepare("
-                SELECT t.tournament_id, t.title, t.description, t.location, t.tournament_held_date,
-                       tsr.status, tsr.request_date
+                SELECT tsr.request_id, tsr.tournament_id, tsr.sponsor_user_id, tsr.request_date, tsr.status, tsr.initiated_by,
+                       t.title AS tournament_title, t.location, t.start_date, t.end_date, t.tournament_held_date, t.status AS tournament_status,
+                       COALESCE(o.organization_name, 'Elle Sports Association') AS organizer_name,
+                       COALESCE(o.contact_number, 'Available on Request') AS contact_number
                 FROM tournament_sponsor_requests tsr
                 JOIN tournaments t ON tsr.tournament_id = t.tournament_id
-                WHERE tsr.sponsor_user_id = ? AND tsr.initiated_by = 'ORGANIZER'
+                LEFT JOIN organizers o ON t.organizer_id = o.user_id
+                WHERE tsr.sponsor_user_id = ?
                 ORDER BY tsr.request_date DESC
             ");
             $stmt->execute([$sponsorUserId]);
             $requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             return ["success" => true, "data" => $requests];
+        } catch (Exception $e) {
+            return ["success" => false, "message" => $e->getMessage()];
+        }
+    }
+
+    public function getSponsorHistory(int $sponsorUserId): array
+    {
+        try {
+            $conn = Database::getConnection();
+            $stmt = $conn->prepare("
+                SELECT tsr.request_id, tsr.tournament_id, tsr.sponsor_user_id, tsr.request_date, tsr.status,
+                       t.title AS tournament_title, t.location, t.tournament_held_date, t.start_date, t.end_date, t.status AS tournament_status,
+                       COALESCE(o.organization_name, 'Elle Sports Association') AS organizer_name,
+                       COALESCE(o.contact_number, 'Available on Request') AS contact_number
+                FROM tournament_sponsor_requests tsr
+                JOIN tournaments t ON tsr.tournament_id = t.tournament_id
+                LEFT JOIN organizers o ON t.organizer_id = o.user_id
+                WHERE tsr.sponsor_user_id = ? AND (tsr.status IN ('APPROVED', 'ACCEPTED') OR t.status = 'COMPLETED')
+                ORDER BY t.tournament_held_date DESC, tsr.request_date DESC
+            ");
+            $stmt->execute([$sponsorUserId]);
+            $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            return ["success" => true, "data" => $history];
         } catch (Exception $e) {
             return ["success" => false, "message" => $e->getMessage()];
         }

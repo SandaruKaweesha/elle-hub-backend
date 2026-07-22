@@ -25,7 +25,7 @@ $requestUri = parse_url(
 );
 
 $requestUri = str_replace(
-    "/elle-hub-backend",
+    ["/elle-hub-backend/public/index.php", "/elle-hub-backend/index.php", "/elle-hub-backend"],
     "",
     $requestUri
 );
