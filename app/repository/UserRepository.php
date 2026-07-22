@@ -68,7 +68,7 @@ class UserRepository{
                        t.team_name, t.rating, t.district,
                        o.organization_name,
                        s.company_name, s.contact_person AS sponsor_contact_person, s.address AS sponsor_address,
-                       p.playground_name, p.located_district, p.location AS playground_location, p.address AS playground_address, p.area AS playground_area, p.area AS area, p.capacity AS capacity,
+                       p.playground_name, p.located_district, p.location AS playground_location, p.address AS playground_address, p.area AS playground_area, p.area AS area, p.area AS capacity,
                        r.full_name AS referee_name, r.experience_years, r.rating AS referee_rating, r.availability_status AS referee_availability_status,
                        COALESCE(t.contact_number, o.contact_number, s.contact_number, p.contact_number, r.contact_number) AS contact_number,
                        COALESCE(t.district, p.located_district, 'Sri Lanka') AS district
