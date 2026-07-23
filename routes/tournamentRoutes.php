@@ -143,6 +143,16 @@ $router->post(
     [TournamentController::class, "respondToPlaygroundRequest"]
 );
 
+$router->get(
+    "/playground/{id}/requests",
+    [TournamentController::class, "getPlaygroundIncomingRequests"]
+);
+
+$router->post(
+    "/tournament/playground-request/cancel",
+    [TournamentController::class, "cancelPlaygroundRequest"]
+);
+
 // Advanced Sponsor Request System
 $router->get(
     "/tournament/{id}/sponsor-requests",
@@ -208,4 +218,34 @@ $router->get(
 $router->post(
     "/referee/availability/save",
     [TournamentController::class, "saveRefereeAvailability"]
+);
+
+$router->get(
+    "/playground/{id}/availability-calendar",
+    [TournamentController::class, "getPlaygroundAvailabilityCalendar"]
+);
+
+$router->post(
+    "/playground/availability/save",
+    [TournamentController::class, "savePlaygroundAvailability"]
+);
+
+$router->get(
+    "/playground/{id}/history",
+    [TournamentController::class, "getPlaygroundHostingHistory"]
+);
+
+$router->get(
+    "/sponsor/{id}/requests",
+    [TournamentController::class, "getSponsorIncomingRequests"]
+);
+
+$router->post(
+    "/tournament/{id}/sponsor-requests/respond",
+    [TournamentController::class, "respondToSponsorRequest"]
+);
+
+$router->get(
+    "/sponsor/{id}/history",
+    [TournamentController::class, "getSponsorHistory"]
 );

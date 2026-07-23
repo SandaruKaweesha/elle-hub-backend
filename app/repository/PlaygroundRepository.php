@@ -17,7 +17,7 @@ class PlaygroundRepository {
                     location,
                     address,
                     contact_number,
-                    capacity
+                    area
                 )
                 VALUES
                 (
@@ -26,7 +26,7 @@ class PlaygroundRepository {
                     :location,
                     :address,
                     :contact_number,
-                    :capacity
+                    :area
                 )";
 
         $statement = $this->connection->prepare($sql);
@@ -36,7 +36,7 @@ class PlaygroundRepository {
         $statement->bindValue(":location", $playground->getLocation());
         $statement->bindValue(":address", $playground->getAddress());
         $statement->bindValue(":contact_number", $playground->getContactNumber());
-        $statement->bindValue(":capacity", $playground->getCapacity());
+        $statement->bindValue(":area", $playground->getArea());
 
         return $statement->execute();
     }
