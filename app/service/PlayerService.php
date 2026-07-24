@@ -87,4 +87,10 @@ class PlayerService
         }
         return ["success" => false, "message" => "Failed to delete player record", "code" => 500];
     }
+
+    public function getPlayersByTeam(int $teamUserId): array
+    {
+        $players = $this->playerRepository->findByTeamUserId($teamUserId);
+        return ["success" => true, "data" => $players, "code" => 200];
+    }
 }

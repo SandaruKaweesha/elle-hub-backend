@@ -69,4 +69,14 @@ class PlayerRepository
         $row = $statement->fetch(PDO::FETCH_ASSOC);
         return $row ?: null;
     }
+
+    public function findByTeamUserId(int $teamUserId): array
+    {
+        $sql = "SELECT * FROM players WHERE team_user_id = :team_user_id ORDER BY player_id ASC";
+        $statement = $this->connection->prepare($sql);
+        $statement->bindValue(":team_user_id", $teamUserId, PDO::PARAM_INT);
+        $statement->execute();
+        
+        return $statement->fetchAll(PDO::FETCH_ASSOC);
+    }
 }

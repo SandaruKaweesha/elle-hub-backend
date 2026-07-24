@@ -19,3 +19,9 @@ $router->delete(
     "/player/{id}",
     [PlayerController::class, "deletePlayer"]
 );
+
+// GET http://localhost/elle-hub-backend/player/team/5
+$router->get(
+    "/player/team/{teamUserId}",
+    [PlayerController::class, "getPlayersByTeam"]
+);
