@@ -152,17 +152,10 @@ class TournamentTeamRequestController
 
     public function getOrganizerTeamRequests($organizerId = null)
     {
-        $authPayload = AuthMiddleware::requireRole(['ORGANIZER']);
+        $authPayload = AuthMiddleware::requireRole(['ORGANIZER', 'ADMIN']);
         $authenticatedId = (int)$authPayload['userId'];
 
         $idToQuery = $organizerId !== null ? (int)$organizerId : $authenticatedId;
-
-        if ($idToQuery !== $authenticatedId) {
-            http_response_code(403);
-            header("Content-Type: application/json");
-            echo json_encode(["success" => false, "message" => "Unauthorized access to request records."]);
-            return;
-        }
 
         $result = $this->service->getOrganizerTeamRequests($idToQuery);
 
