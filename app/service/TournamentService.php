@@ -1024,5 +1024,236 @@ class TournamentService{
             return 5.0;
         }
     }
-}
 
+    public function finalizeTournament(int $tournamentId): array
+    {
+        try {
+            $db = Database::getConnection();
+            $stmt = $db->prepare("UPDATE tournaments SET is_finalized = 1, status = 'ONGOING' WHERE tournament_id = ?");
+            $stmt->execute([$tournamentId]);
+
+            return [
+                "success" => true,
+                "message" => "Tournament setup finalized successfully!"
+            ];
+        } catch (Exception $e) {
+            return [
+                "success" => false,
+                "message" => "Error finalizing tournament: " . $e->getMessage()
+            ];
+        }
+    }
+
+    public function getTournamentDraw(int $tournamentId): array
+    {
+        try {
+            $db = Database::getConnection();
+            
+            $stmt = $db->prepare("SELECT tournament_id, title, location, description, rules, prize_details, start_date, end_date, tournament_held_date, maximum_team_limit, status, is_finalized, is_draw_finalized, draw_data FROM tournaments WHERE tournament_id = ?");
+            $stmt->execute([$tournamentId]);
+            $tournament = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$tournament) {
+                return ["success" => false, "message" => "Tournament not found"];
+            }
+
+            $teamStmt = $db->prepare("
+                SELECT u.user_id, u.email, 
+                       COALESCE(t.team_name, u.email) as team_name, 
+                       COALESCE(t.district, 'Sri Lanka') as district
+                FROM tournament_team_requests ttr
+                JOIN users u ON ttr.team_user_id = u.user_id
+                LEFT JOIN teams t ON u.user_id = t.user_id
+                WHERE ttr.tournament_id = ? AND (ttr.status = 'APPROVED' OR ttr.status = 'ACCEPTED')
+            ");
+            $teamStmt->execute([$tournamentId]);
+            $participatingTeams = $teamStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            $drawData = null;
+            if (!empty($tournament['draw_data'])) {
+                $drawData = json_decode($tournament['draw_data'], true);
+            } else if (!empty($participatingTeams)) {
+                $shuffleRes = $this->shuffleTournamentDraw($tournamentId, 'RANDOM');
+                if ($shuffleRes['success'] && isset($shuffleRes['data']['drawData'])) {
+                    $drawData = $shuffleRes['data']['drawData'];
+                }
+            }
+
+            return [
+                "success" => true,
+                "data" => [
+                    "tournament" => $tournament,
+                    "teams" => $participatingTeams,
+                    "isFinalized" => (int) ($tournament['is_finalized'] ?? 0) === 1,
+                    "isDrawFinalized" => (int) ($tournament['is_draw_finalized'] ?? 0) === 1,
+                    "drawData" => $drawData
+                ]
+            ];
+        } catch (Exception $e) {
+            return [
+                "success" => false,
+                "message" => "Error fetching tournament draw: " . $e->getMessage()
+            ];
+        }
+    }
+
+    public function shuffleTournamentDraw(int $tournamentId, string $mode = 'SYSTEM'): array
+    {
+        try {
+            $db = Database::getConnection();
+
+            $teamStmt = $db->prepare("
+                SELECT u.user_id, u.email, 
+                       COALESCE(t.team_name, u.email) as team_name, 
+                       COALESCE(t.district, 'Sri Lanka') as district
+                FROM tournament_team_requests ttr
+                JOIN users u ON ttr.team_user_id = u.user_id
+                LEFT JOIN teams t ON u.user_id = t.user_id
+                WHERE ttr.tournament_id = ? AND (ttr.status = 'APPROVED' OR ttr.status = 'ACCEPTED')
+            ");
+            $teamStmt->execute([$tournamentId]);
+            $teams = $teamStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            if (empty($teams)) {
+                return ["success" => false, "message" => "No approved participating teams found for match draw."];
+            }
+
+            // System Match Drawing Algorithm:
+            // 1. Group teams by district for fair distribution
+            $byDistrict = [];
+            foreach ($teams as $team) {
+                $d = !empty($team['district']) ? $team['district'] : 'Sri Lanka';
+                $byDistrict[$d][] = $team;
+            }
+
+            $shuffledTeams = [];
+            $groupA = [];
+            $groupB = [];
+            $toggle = true;
+
+            foreach ($byDistrict as $district => $dTeams) {
+                shuffle($dTeams);
+                foreach ($dTeams as $t) {
+                    if ($toggle) {
+                        $groupA[] = $t;
+                    } else {
+                        $groupB[] = $t;
+                    }
+                    $toggle = !$toggle;
+                }
+            }
+
+            $shuffledTeams = array_merge($groupA, $groupB);
+
+            // Construct Primary Round Match Pairings
+            $primaryRoundMatches = [];
+            for ($i = 0; $i < count($shuffledTeams); $i += 2) {
+                $team1 = $shuffledTeams[$i];
+                $team2 = isset($shuffledTeams[$i + 1]) ? $shuffledTeams[$i + 1] : null;
+
+                $primaryRoundMatches[] = [
+                    "matchNumber" => count($primaryRoundMatches) + 1,
+                    "stage" => "Primary Round",
+                    "team1" => $team1,
+                    "team2" => $team2,
+                    "winner" => null // Set by organizer after match play
+                ];
+            }
+
+            $drawData = [
+                "teams" => $shuffledTeams,
+                "primaryRoundMatches" => $primaryRoundMatches,
+                "shuffleMode" => "SYSTEM_AUTOMATIC",
+                "drawFormat" => "knockout",
+                "shuffledAt" => date('Y-m-d H:i:s')
+            ];
+
+            $drawDataJson = json_encode($drawData);
+            $updateStmt = $db->prepare("UPDATE tournaments SET draw_data = ? WHERE tournament_id = ?");
+            $updateStmt->execute([$drawDataJson, $tournamentId]);
+
+            return [
+                "success" => true,
+                "message" => "Primary round matches and tournament draw scheduled successfully by the system!",
+                "data" => [
+                    "teams" => $shuffledTeams,
+                    "drawData" => $drawData
+                ]
+            ];
+        } catch (Exception $e) {
+            return [
+                "success" => false,
+                "message" => "Error generating match draw: " . $e->getMessage()
+            ];
+        }
+    }
+
+    public function saveTournamentDraw(int $tournamentId, object $request): array
+    {
+        try {
+            $db = Database::getConnection();
+            $drawDataJson = isset($request->drawData) ? json_encode($request->drawData) : json_encode($request);
+
+            $stmt = $db->prepare("UPDATE tournaments SET is_draw_finalized = 1, draw_data = ? WHERE tournament_id = ?");
+            $stmt->execute([$drawDataJson, $tournamentId]);
+
+            $rawTeams = isset($request->drawData->teams) ? $request->drawData->teams : (isset($request->teams) ? $request->teams : []);
+            if (!empty($rawTeams)) {
+                $stmtDelete = $db->prepare("DELETE FROM matches WHERE tournament_id = ?");
+                $stmtDelete->execute([$tournamentId]);
+
+                $half = ceil(count($rawTeams) / 2);
+                $groupA = array_slice($rawTeams, 0, $half);
+                $groupB = array_slice($rawTeams, $half);
+
+                for ($i = 0; $i < count($groupA); $i += 2) {
+                    $stmtMatch = $db->prepare("INSERT INTO matches (tournament_id, round, status) VALUES (?, 'Group A - Quarter Final', 'SCHEDULED')");
+                    $stmtMatch->execute([$tournamentId]);
+                }
+                for ($i = 0; $i < count($groupB); $i += 2) {
+                    $stmtMatch = $db->prepare("INSERT INTO matches (tournament_id, round, status) VALUES (?, 'Group B - Quarter Final', 'SCHEDULED')");
+                    $stmtMatch->execute([$tournamentId]);
+                }
+                $stmtSF1 = $db->prepare("INSERT INTO matches (tournament_id, round, status) VALUES (?, 'Semi Final 1', 'SCHEDULED')");
+                $stmtSF1->execute([$tournamentId]);
+                $stmtSF2 = $db->prepare("INSERT INTO matches (tournament_id, round, status) VALUES (?, 'Semi Final 2', 'SCHEDULED')");
+                $stmtSF2->execute([$tournamentId]);
+                $stmtFinal = $db->prepare("INSERT INTO matches (tournament_id, round, status) VALUES (?, 'Final Match', 'SCHEDULED')");
+                $stmtFinal->execute([$tournamentId]);
+            }
+
+            return [
+                "success" => true,
+                "message" => "Tournament match draw schedule finalized successfully!"
+            ];
+        } catch (Exception $e) {
+            return [
+                "success" => false,
+                "message" => "Error saving match draw: " . $e->getMessage()
+            ];
+        }
+    }
+
+    public function completeTournament(int $tournamentId): array
+    {
+        try {
+            $db = Database::getConnection();
+
+            $stmt = $db->prepare("UPDATE tournaments SET status = 'COMPLETED' WHERE tournament_id = ?");
+            $stmt->execute([$tournamentId]);
+
+            $stmtMatch = $db->prepare("UPDATE matches SET status = 'COMPLETED' WHERE tournament_id = ?");
+            $stmtMatch->execute([$tournamentId]);
+
+            return [
+                "success" => true,
+                "message" => "Tournament has been successfully completed!"
+            ];
+        } catch (Exception $e) {
+            return [
+                "success" => false,
+                "message" => "Error completing tournament: " . $e->getMessage()
+            ];
+        }
+    }
+}

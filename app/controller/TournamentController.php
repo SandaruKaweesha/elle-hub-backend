@@ -195,7 +195,40 @@ class TournamentController{
     public function finalizeTournament($tournamentId)
     {
         header(self::JSON_HEADER);
-        $result = $this->tournamentService->updateTournamentStatus((int) $tournamentId, "ONGOING");
+        $result = $this->tournamentService->finalizeTournament((int) $tournamentId);
+        echo json_encode($result);
+    }
+
+    public function getTournamentDraw($tournamentId)
+    {
+        header(self::JSON_HEADER);
+        $result = $this->tournamentService->getTournamentDraw((int) $tournamentId);
+        echo json_encode($result);
+    }
+
+    public function saveTournamentDraw($tournamentId)
+    {
+        header(self::JSON_HEADER);
+        $requestBody = file_get_contents("php://input");
+        $requestObject = json_decode($requestBody);
+        $result = $this->tournamentService->saveTournamentDraw((int) $tournamentId, $requestObject);
+        echo json_encode($result);
+    }
+
+    public function shuffleTournamentDraw($tournamentId)
+    {
+        header(self::JSON_HEADER);
+        $requestBody = file_get_contents("php://input");
+        $requestObject = json_decode($requestBody);
+        $mode = isset($requestObject->mode) ? $requestObject->mode : 'RANDOM';
+        $result = $this->tournamentService->shuffleTournamentDraw((int) $tournamentId, $mode);
+        echo json_encode($result);
+    }
+
+    public function completeTournament($tournamentId)
+    {
+        header(self::JSON_HEADER);
+        $result = $this->tournamentService->completeTournament((int) $tournamentId);
         echo json_encode($result);
     }
 

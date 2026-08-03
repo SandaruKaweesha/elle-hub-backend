@@ -127,6 +127,26 @@ $router->post(
     [TournamentController::class, "finalizeTournament"]
 );
 
+$router->get(
+    "/tournament/{id}/draw",
+    [TournamentController::class, "getTournamentDraw"]
+);
+
+$router->post(
+    "/tournament/{id}/draw",
+    [TournamentController::class, "saveTournamentDraw"]
+);
+
+$router->post(
+    "/tournament/{id}/draw/shuffle",
+    [TournamentController::class, "shuffleTournamentDraw"]
+);
+
+$router->post(
+    "/tournament/{id}/complete",
+    [TournamentController::class, "completeTournament"]
+);
+
 // Advanced Playground Request System
 $router->get(
     "/tournament/{id}/playground-requests",
