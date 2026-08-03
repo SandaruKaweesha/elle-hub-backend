@@ -72,10 +72,14 @@ class TournamentTeamRequestController
 
     public function getTeamRequests($teamUserId = null)
     {
-        $authPayload = AuthMiddleware::requireRole(['TEAM']);
+        $authPayload = AuthMiddleware::requireRole(['TEAM', 'ADMIN']);
         $authenticatedId = (int)$authPayload['userId'];
 
-        $idToQuery = $teamUserId !== null ? (int)$teamUserId : $authenticatedId;
+        if ($teamUserId === null || !is_numeric($teamUserId) || (int)$teamUserId <= 0) {
+            $idToQuery = $authenticatedId;
+        } else {
+            $idToQuery = (int)$teamUserId;
+        }
 
         // Verify authorization
         if ($idToQuery !== $authenticatedId) {
@@ -228,6 +232,34 @@ class TournamentTeamRequestController
             http_response_code(400);
         }
 
+        header("Content-Type: application/json");
+        echo json_encode($result);
+    }
+
+    public function respondToTeamRequest($tournamentId)
+    {
+        $authPayload = AuthMiddleware::requireRole(['ORGANIZER', 'TEAM', 'ADMIN']);
+
+        $requestBody = file_get_contents("php://input");
+        $requestObject = json_decode($requestBody);
+
+        $teamUserId = isset($requestObject->teamUserId) ? (int)$requestObject->teamUserId : null;
+        $status = isset($requestObject->status) ? strtoupper($requestObject->status) : null;
+
+        if (!$tournamentId || !$teamUserId || !$status) {
+            http_response_code(400);
+            header("Content-Type: application/json");
+            echo json_encode(["success" => false, "message" => "Tournament ID, Team User ID, and status are required."]);
+            return;
+        }
+
+        if ($status === 'APPROVED' || $status === 'ACCEPTED') {
+            $result = $this->service->approveRequest((int)$tournamentId, $teamUserId);
+        } else {
+            $result = $this->service->rejectRequest((int)$tournamentId, $teamUserId);
+        }
+
+        http_response_code(200);
         header("Content-Type: application/json");
         echo json_encode($result);
     }

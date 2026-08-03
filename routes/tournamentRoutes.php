@@ -18,6 +18,11 @@ $router->get(
     "/tournaments",
     [TournamentController::class, "getApprovedTournaments"]
 );
+
+$router->get(
+    "/tournaments/approved",
+    [TournamentController::class, "getApprovedTournaments"]
+);
 $router->put(
     "/organizer/tournament/{id}/status",
     [TournamentController::class, "updateTournamentStatus"]
@@ -44,6 +49,11 @@ $router->put(
     "/organizer/tournament/{id}",
     [TournamentController::class, "updateTournament"]
 );
+$router->get(
+    "/organizer/tournaments",
+    [TournamentController::class, "getOrganizerTournaments"]
+);
+
 $router->get(
     "/organizer/{id}/tournaments",
     [TournamentController::class, "getOrganizerTournaments"]
@@ -94,6 +104,21 @@ $router->get(
 $router->get(
     "/tournament/{id}/team-requests",
     [TournamentTeamRequestController::class, "getTournamentTeamRequests"]
+);
+
+$router->post(
+    "/tournament/{id}/team-requests/respond",
+    [TournamentTeamRequestController::class, "respondToTeamRequest"]
+);
+
+$router->post(
+    "/tournament/request/invite",
+    [TournamentTeamRequestController::class, "inviteTeam"]
+);
+
+$router->post(
+    "/tournament/{id}/team-requests/send",
+    [TournamentTeamRequestController::class, "inviteTeam"]
 );
 
 $router->post(
@@ -192,6 +217,11 @@ $router->post(
 $router->get(
     "/sponsor/{id}/requests",
     [TournamentController::class, "getSponsorIncomingRequests"]
+);
+
+$router->get(
+    "/organizer/{id}/sponsor-requests",
+    [TournamentController::class, "getOrganizerSponsorRequests"]
 );
 
 // Advanced Referee Request System

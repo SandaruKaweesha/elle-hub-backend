@@ -27,6 +27,12 @@ $router->get(
     [UserController::class, "searchUser"]
 );
 
+// GET http://localhost/elle-hub-backend/user/profile
+$router->get(
+    "/user/profile",
+    [UserController::class, "getCurrentUserProfile"]
+);
+
 //GET http://localhost/elle-hub-backend/user/5
 $router->get(
     "/user/{id}",

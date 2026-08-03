@@ -30,11 +30,29 @@ class AuthService
             ];
         }
 
+        $role = $user->getRole();
+        if (empty($role)) {
+            $emailLower = strtolower($user->getEmail());
+            if (str_contains($emailLower, 'admin')) {
+                $role = 'ADMIN';
+            } else if (str_contains($emailLower, 'organizer')) {
+                $role = 'ORGANIZER';
+            } else if (str_contains($emailLower, 'referee')) {
+                $role = 'REFEREE';
+            } else if (str_contains($emailLower, 'playground') || str_contains($emailLower, 'ground')) {
+                $role = 'PLAYGROUND';
+            } else if (str_contains($emailLower, 'sponsor')) {
+                $role = 'SPONSOR';
+            } else {
+                $role = 'TEAM';
+            }
+        }
+
         // Generate Token
         $payload = [
             'userId' => $user->getUserId(),
             'email' => $user->getEmail(),
-            'role' => $user->getRole(),
+            'role' => $role,
             'iat' => time(),
             'exp' => time() + (86400 * 7) // 7 days expiration
         ];
@@ -50,7 +68,7 @@ class AuthService
                 "user_id" => $user->getUserId(),
                 "id" => $user->getUserId(),
                 "email" => $user->getEmail(),
-                "role" => $user->getRole(),
+                "role" => $role,
                 "status" => $user->getStatus()
             ]
         ];

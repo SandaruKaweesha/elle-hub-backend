@@ -203,4 +203,21 @@ class UserController{
 
         echo json_encode($result);
     }
+
+    public function getCurrentUserProfile()
+    {
+        require_once __DIR__ . "/../core/AuthMiddleware.php";
+        header("Content-Type: application/json");
+        $authPayload = AuthMiddleware::getPayload();
+        $userId = (int)($authPayload['userId'] ?? 0);
+
+        if (!$userId) {
+            http_response_code(401);
+            echo json_encode(["success" => false, "message" => "Unauthorized"]);
+            return;
+        }
+
+        $result = $this->userService->getUserById($userId);
+        echo json_encode($result);
+    }
 }
