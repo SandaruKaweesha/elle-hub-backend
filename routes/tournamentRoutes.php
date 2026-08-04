@@ -59,6 +59,12 @@ $router->get(
     [TournamentController::class, "getOrganizerTournaments"]
 );
 
+$router->get(
+    "/organizer/{id}/history",
+    [TournamentController::class, "getOrganizerHistory"]
+);
+
+
 // Tournament Join Participation Requests
 $router->post(
     "/tournament/request",
@@ -299,3 +305,8 @@ $router->get(
     "/sponsor/{id}/history",
     [TournamentController::class, "getSponsorHistory"]
 );
+
+$router->get(
+    "/team/{id}/history",
+    [TournamentController::class, "getTeamTournamentHistory"]
+);

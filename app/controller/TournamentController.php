@@ -539,10 +539,34 @@ class TournamentController{
         echo json_encode($result);
     }
 
+    public function getRefereeOfficiatingHistory($refereeUserId)
+    {
+        header(self::JSON_HEADER);
+        $result = $this->tournamentService->getRefereeOfficiatingHistory((int) $refereeUserId);
+        echo json_encode($result);
+    }
+
+
     public function getSponsorHistory($sponsorUserId)
     {
         header(self::JSON_HEADER);
         $result = $this->tournamentService->getSponsorHistory((int) $sponsorUserId);
         echo json_encode($result);
     }
+
+    public function getTeamTournamentHistory($teamUserId)
+    {
+        header(self::JSON_HEADER);
+        $result = $this->tournamentService->getTeamTournamentHistory((int) $teamUserId);
+        echo json_encode($result);
+    }
+
+    public function getOrganizerHistory($organizerId)
+    {
+        header(self::JSON_HEADER);
+        $result = $this->tournamentService->getOrganizerHistory((int) $organizerId);
+        echo json_encode($result);
+    }
 }
+
+

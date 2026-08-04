@@ -303,6 +303,28 @@ class TournamentService{
         ];
     }
 
+    public function getOrganizerHistory(int $organizerId): array
+    {
+        try {
+            $conn = Database::getConnection();
+            $sql = "SELECT t.*, 
+                           (SELECT COUNT(*) FROM tournament_team_requests WHERE tournament_id = t.tournament_id AND status = 'APPROVED') AS participating_teams_count,
+                           (SELECT COUNT(*) FROM tournament_referee_requests WHERE tournament_id = t.tournament_id AND status IN ('ACCEPTED', 'APPROVED')) AS assigned_referees_count,
+                           (SELECT COUNT(*) FROM tournament_sponsor_requests WHERE tournament_id = t.tournament_id AND status IN ('ACCEPTED', 'APPROVED')) AS sponsors_count
+                    FROM tournaments t
+                    WHERE t.organizer_id = ? AND UPPER(t.status) = 'COMPLETED'
+                    ORDER BY COALESCE(t.tournament_held_date, t.end_date, t.start_date, t.created_at) DESC";
+            $stmt = $conn->prepare($sql);
+            $stmt->execute([$organizerId]);
+            $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            return ["success" => true, "data" => $history];
+        } catch (Exception $e) {
+            return ["success" => false, "message" => $e->getMessage()];
+        }
+    }
+
+
     public function getAllTournaments(): array
     {
         try {
@@ -650,15 +672,17 @@ class TournamentService{
         try {
             $conn = Database::getConnection();
             $stmt = $conn->prepare("
-                SELECT tsr.request_id, tsr.tournament_id, tsr.sponsor_user_id, tsr.request_date, tsr.status,
+                SELECT tsr.request_id, tsr.tournament_id, tsr.sponsor_user_id, tsr.request_date, tsr.status AS request_status,
                        t.title AS tournament_title, t.location, t.tournament_held_date, t.start_date, t.end_date, t.status AS tournament_status,
                        COALESCE(o.organization_name, 'Elle Sports Association') AS organizer_name,
                        COALESCE(o.contact_number, 'Available on Request') AS contact_number
                 FROM tournament_sponsor_requests tsr
                 JOIN tournaments t ON tsr.tournament_id = t.tournament_id
                 LEFT JOIN organizers o ON t.organizer_id = o.user_id
-                WHERE tsr.sponsor_user_id = ? AND (tsr.status IN ('APPROVED', 'ACCEPTED') OR t.status = 'COMPLETED')
-                ORDER BY t.tournament_held_date DESC, tsr.request_date DESC
+                WHERE tsr.sponsor_user_id = ? 
+                  AND tsr.status IN ('APPROVED', 'ACCEPTED') 
+                  AND UPPER(t.status) = 'COMPLETED'
+                ORDER BY COALESCE(t.tournament_held_date, t.start_date, tsr.request_date) DESC
             ");
             $stmt->execute([$sponsorUserId]);
             $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -668,6 +692,7 @@ class TournamentService{
             return ["success" => false, "message" => $e->getMessage()];
         }
     }
+
 
     // Referee Requests
     public function getRefereeRequests(int $tournamentId): array
@@ -941,6 +966,37 @@ class TournamentService{
             return ["success" => false, "message" => $e->getMessage()];
         }
     }
+
+    public function getPlaygroundHistory(int $playgroundUserId): array
+    {
+        return $this->getPlaygroundHostingHistory($playgroundUserId);
+    }
+
+    public function getTeamTournamentHistory(int $teamUserId): array
+    {
+        try {
+            $conn = Database::getConnection();
+            $sql = "SELECT r.tournament_id, r.team_user_id, r.request_date, r.status AS request_status,
+                           t.title AS tournament_title, t.location, t.start_date, t.end_date, t.tournament_held_date, t.status AS tournament_status,
+                           t.draw_data, t.prize_details, t.rules,
+                           COALESCE(o.organization_name, 'Elle Sports Association') AS organizer_name,
+                           COALESCE(o.contact_number, 'N/A') AS contact_number
+                    FROM tournament_team_requests r
+                    JOIN tournaments t ON r.tournament_id = t.tournament_id
+                    LEFT JOIN organizers o ON t.organizer_id = o.user_id
+                    WHERE r.team_user_id = ?
+                      AND r.status IN ('ACCEPTED', 'APPROVED')
+                      AND UPPER(t.status) = 'COMPLETED'
+                    ORDER BY COALESCE(t.tournament_held_date, t.start_date, r.request_date) DESC";
+            $stmt = $conn->prepare($sql);
+            $stmt->execute([$teamUserId]);
+            return ["success" => true, "data" => $stmt->fetchAll(PDO::FETCH_ASSOC)];
+        } catch (Exception $e) {
+            return ["success" => false, "message" => $e->getMessage()];
+        }
+    }
+
+
 
     public function saveRefereeAvailability(int $refereeUserId, string $availableDate, string $status): array
     {
