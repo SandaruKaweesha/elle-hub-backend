@@ -115,6 +115,7 @@ class TournamentTeamRequestRepository
                        COALESCE(tm.contact_number, 'N/A') AS contact_number,
                        tm.rating,
                        COALESCE(tm.district, 'N/A') AS district,
+                       u.email,
                        (SELECT COUNT(*) FROM players WHERE team_user_id = r.team_user_id) AS squad_size
                 FROM tournament_team_requests r
                 JOIN tournaments t ON r.tournament_id = t.tournament_id

@@ -303,6 +303,28 @@ class TournamentService{
         ];
     }
 
+    public function getOrganizerHistory(int $organizerId): array
+    {
+        try {
+            $conn = Database::getConnection();
+            $sql = "SELECT t.*, 
+                           (SELECT COUNT(*) FROM tournament_team_requests WHERE tournament_id = t.tournament_id AND status = 'APPROVED') AS participating_teams_count,
+                           (SELECT COUNT(*) FROM tournament_referee_requests WHERE tournament_id = t.tournament_id AND status IN ('ACCEPTED', 'APPROVED')) AS assigned_referees_count,
+                           (SELECT COUNT(*) FROM tournament_sponsor_requests WHERE tournament_id = t.tournament_id AND status IN ('ACCEPTED', 'APPROVED')) AS sponsors_count
+                    FROM tournaments t
+                    WHERE t.organizer_id = ? AND UPPER(t.status) = 'COMPLETED'
+                    ORDER BY COALESCE(t.tournament_held_date, t.end_date, t.start_date, t.created_at) DESC";
+            $stmt = $conn->prepare($sql);
+            $stmt->execute([$organizerId]);
+            $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            return ["success" => true, "data" => $history];
+        } catch (Exception $e) {
+            return ["success" => false, "message" => $e->getMessage()];
+        }
+    }
+
+
     public function getAllTournaments(): array
     {
         try {
@@ -383,8 +405,14 @@ class TournamentService{
             }
 
             if (isset($request->refereeUserIds) && is_array($request->refereeUserIds)) {
+                $stmtRefCheck = $conn->prepare("SELECT user_id FROM referees WHERE user_id = ?");
+                $stmtInsRef = $conn->prepare("INSERT INTO referees (user_id) VALUES (?)");
                 $stmt = $conn->prepare("INSERT INTO tournament_referee_requests (tournament_id, referee_user_id, status, request_date) VALUES (?, ?, 'APPROVED', NOW())");
                 foreach ($request->refereeUserIds as $rid) {
+                    $stmtRefCheck->execute([$rid]);
+                    if (!$stmtRefCheck->fetch()) {
+                        $stmtInsRef->execute([$rid]);
+                    }
                     $stmt->execute([$tournamentId, $rid]);
                 }
             }
@@ -420,6 +448,14 @@ class TournamentService{
     {
         try {
             $conn = Database::getConnection();
+
+            // Ensure playground record exists in playgrounds table to satisfy FK constraint fk_playground_request_playground
+            $stmtPgCheck = $conn->prepare("SELECT user_id FROM playgrounds WHERE user_id = ?");
+            $stmtPgCheck->execute([$playgroundUserId]);
+            if (!$stmtPgCheck->fetch()) {
+                $conn->prepare("INSERT INTO playgrounds (user_id) VALUES (?)")->execute([$playgroundUserId]);
+            }
+
             // Check if already requested
             $stmt = $conn->prepare("SELECT status FROM tournament_playground_requests WHERE tournament_id = ? AND playground_user_id = ?");
             $stmt->execute([$tournamentId, $playgroundUserId]);
@@ -538,6 +574,14 @@ class TournamentService{
     {
         try {
             $conn = Database::getConnection();
+
+            // Ensure sponsor record exists in sponsors table to satisfy FK constraint fk_sponsor_request_sponsor
+            $stmtSpCheck = $conn->prepare("SELECT user_id FROM sponsors WHERE user_id = ?");
+            $stmtSpCheck->execute([$sponsorUserId]);
+            if (!$stmtSpCheck->fetch()) {
+                $conn->prepare("INSERT INTO sponsors (user_id) VALUES (?)")->execute([$sponsorUserId]);
+            }
+
             // Check if already requested
             $stmt = $conn->prepare("SELECT status FROM tournament_sponsor_requests WHERE tournament_id = ? AND sponsor_user_id = ?");
             $stmt->execute([$tournamentId, $sponsorUserId]);
@@ -598,20 +642,47 @@ class TournamentService{
         }
     }
 
+    public function getOrganizerSponsorRequests(int $organizerId): array
+    {
+        try {
+            $conn = Database::getConnection();
+            $stmt = $conn->prepare("
+                SELECT tsr.request_id, tsr.tournament_id, tsr.sponsor_user_id, tsr.request_date, tsr.status, tsr.initiated_by,
+                       t.title AS tournament_title,
+                       COALESCE(s.company_name, u.email, 'Official Sponsor') AS company_name,
+                       u.email
+                FROM tournament_sponsor_requests tsr
+                JOIN tournaments t ON tsr.tournament_id = t.tournament_id
+                JOIN users u ON tsr.sponsor_user_id = u.user_id
+                LEFT JOIN sponsors s ON u.user_id = s.user_id
+                WHERE t.organizer_id = ?
+                ORDER BY tsr.request_date DESC
+            ");
+            $stmt->execute([$organizerId]);
+            $requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            return ["success" => true, "data" => $requests];
+        } catch (Exception $e) {
+            return ["success" => false, "message" => $e->getMessage()];
+        }
+    }
+
     public function getSponsorHistory(int $sponsorUserId): array
     {
         try {
             $conn = Database::getConnection();
             $stmt = $conn->prepare("
-                SELECT tsr.request_id, tsr.tournament_id, tsr.sponsor_user_id, tsr.request_date, tsr.status,
+                SELECT tsr.request_id, tsr.tournament_id, tsr.sponsor_user_id, tsr.request_date, tsr.status AS request_status,
                        t.title AS tournament_title, t.location, t.tournament_held_date, t.start_date, t.end_date, t.status AS tournament_status,
                        COALESCE(o.organization_name, 'Elle Sports Association') AS organizer_name,
                        COALESCE(o.contact_number, 'Available on Request') AS contact_number
                 FROM tournament_sponsor_requests tsr
                 JOIN tournaments t ON tsr.tournament_id = t.tournament_id
                 LEFT JOIN organizers o ON t.organizer_id = o.user_id
-                WHERE tsr.sponsor_user_id = ? AND (tsr.status IN ('APPROVED', 'ACCEPTED') OR t.status = 'COMPLETED')
-                ORDER BY t.tournament_held_date DESC, tsr.request_date DESC
+                WHERE tsr.sponsor_user_id = ? 
+                  AND tsr.status IN ('APPROVED', 'ACCEPTED') 
+                  AND UPPER(t.status) = 'COMPLETED'
+                ORDER BY COALESCE(t.tournament_held_date, t.start_date, tsr.request_date) DESC
             ");
             $stmt->execute([$sponsorUserId]);
             $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -621,6 +692,7 @@ class TournamentService{
             return ["success" => false, "message" => $e->getMessage()];
         }
     }
+
 
     // Referee Requests
     public function getRefereeRequests(int $tournamentId): array
@@ -641,10 +713,17 @@ class TournamentService{
         }
     }
 
-    public function sendRefereeRequest(int $tournamentId, int $refereeUserId, string $initiatedBy = 'ORGANIZER'): array
+    public function sendRefereeRequest(int $tournamentId, int $refereeUserId, string $initiatedBy): array
     {
         try {
             $conn = Database::getConnection();
+
+            // Ensure referee record exists in referees table to satisfy FK constraint fk_ref_request_referee
+            $stmtRefCheck = $conn->prepare("SELECT user_id FROM referees WHERE user_id = ?");
+            $stmtRefCheck->execute([$refereeUserId]);
+            if (!$stmtRefCheck->fetch()) {
+                $conn->prepare("INSERT INTO referees (user_id) VALUES (?)")->execute([$refereeUserId]);
+            }
 
             // Check if request already exists to prevent duplicate entry exception
             $stmtCheck = $conn->prepare("SELECT status FROM tournament_referee_requests WHERE tournament_id = ? AND referee_user_id = ?");
@@ -888,6 +967,37 @@ class TournamentService{
         }
     }
 
+    public function getPlaygroundHistory(int $playgroundUserId): array
+    {
+        return $this->getPlaygroundHostingHistory($playgroundUserId);
+    }
+
+    public function getTeamTournamentHistory(int $teamUserId): array
+    {
+        try {
+            $conn = Database::getConnection();
+            $sql = "SELECT r.tournament_id, r.team_user_id, r.request_date, r.status AS request_status,
+                           t.title AS tournament_title, t.location, t.start_date, t.end_date, t.tournament_held_date, t.status AS tournament_status,
+                           t.draw_data, t.prize_details, t.rules,
+                           COALESCE(o.organization_name, 'Elle Sports Association') AS organizer_name,
+                           COALESCE(o.contact_number, 'N/A') AS contact_number
+                    FROM tournament_team_requests r
+                    JOIN tournaments t ON r.tournament_id = t.tournament_id
+                    LEFT JOIN organizers o ON t.organizer_id = o.user_id
+                    WHERE r.team_user_id = ?
+                      AND r.status IN ('ACCEPTED', 'APPROVED')
+                      AND UPPER(t.status) = 'COMPLETED'
+                    ORDER BY COALESCE(t.tournament_held_date, t.start_date, r.request_date) DESC";
+            $stmt = $conn->prepare($sql);
+            $stmt->execute([$teamUserId]);
+            return ["success" => true, "data" => $stmt->fetchAll(PDO::FETCH_ASSOC)];
+        } catch (Exception $e) {
+            return ["success" => false, "message" => $e->getMessage()];
+        }
+    }
+
+
+
     public function saveRefereeAvailability(int $refereeUserId, string $availableDate, string $status): array
     {
         try {
@@ -989,7 +1099,6 @@ class TournamentService{
         try {
             $conn = Database::getConnection();
             
-            // Count completed tournaments officiated by this referee
             $sql = "SELECT COUNT(DISTINCT r.tournament_id) AS completed_count
                     FROM tournament_referee_requests r
                     JOIN tournaments t ON r.tournament_id = t.tournament_id
@@ -1001,23 +1110,13 @@ class TournamentService{
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
             $completedCount = (int) ($row['completed_count'] ?? 0);
 
-            // Calculation Formula:
-            // Base Rating: 5.0 (out of 10.0 max)
-            // Each completed tournament officiated adds +0.5 points
-            // Maximum cap: 10.0
             $rating = 5.0 + ($completedCount * 0.5);
             if ($rating > 10.0) {
                 $rating = 10.0;
             }
-            $rating = round($rating, 1);
 
-            // Update in referees table
-            $stmtRef = $conn->prepare("UPDATE referees SET referee_rating = ? WHERE user_id = ?");
-            $stmtRef->execute([$rating, $refereeUserId]);
-
-            // Update in users table if column exists
-            $stmtUsers = $conn->prepare("UPDATE users SET referee_rating = ? WHERE user_id = ?");
-            $stmtUsers->execute([$rating, $refereeUserId]);
+            $updateStmt = $conn->prepare("UPDATE referees SET rating = ? WHERE user_id = ?");
+            $updateStmt->execute([$rating, $refereeUserId]);
 
             return $rating;
         } catch (Exception $e) {
@@ -1025,24 +1124,7 @@ class TournamentService{
         }
     }
 
-    public function finalizeTournament(int $tournamentId): array
-    {
-        try {
-            $db = Database::getConnection();
-            $stmt = $db->prepare("UPDATE tournaments SET is_finalized = 1, status = 'ONGOING' WHERE tournament_id = ?");
-            $stmt->execute([$tournamentId]);
 
-            return [
-                "success" => true,
-                "message" => "Tournament setup finalized successfully!"
-            ];
-        } catch (Exception $e) {
-            return [
-                "success" => false,
-                "message" => "Error finalizing tournament: " . $e->getMessage()
-            ];
-        }
-    }
 
     public function getTournamentDraw(int $tournamentId): array
     {
@@ -1093,6 +1175,50 @@ class TournamentService{
             return [
                 "success" => false,
                 "message" => "Error fetching tournament draw: " . $e->getMessage()
+            ];
+        }
+    }
+
+    public function finalizeTournament(int $tournamentId): array
+    {
+        try {
+            $db = Database::getConnection();
+
+            $stmt = $db->prepare("SELECT * FROM tournaments WHERE tournament_id = ?");
+            $stmt->execute([$tournamentId]);
+            $tournament = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$tournament) {
+                return ["success" => false, "message" => "Tournament not found"];
+            }
+
+            // Update status to ACTIVE/ONGOING and is_finalized = 1
+            $stmtUpdate = $db->prepare("UPDATE tournaments SET status = 'ACTIVE', is_finalized = 1 WHERE tournament_id = ?");
+            $stmtUpdate->execute([$tournamentId]);
+
+            // Auto-generate or fetch match draw
+            $drawRes = $this->getTournamentDraw($tournamentId);
+            $drawData = $drawRes['data']['drawData'] ?? null;
+
+            if (!$drawData) {
+                $shuffleRes = $this->shuffleTournamentDraw($tournamentId, 'SYSTEM');
+                if ($shuffleRes['success'] && isset($shuffleRes['data']['drawData'])) {
+                    $drawData = $shuffleRes['data']['drawData'];
+                }
+            }
+
+            return [
+                "success" => true,
+                "message" => "Tournament setup finalized successfully! Match draw generated.",
+                "data" => [
+                    "tournament" => $tournament,
+                    "drawData" => $drawData
+                ]
+            ];
+        } catch (Exception $e) {
+            return [
+                "success" => false,
+                "message" => "Error finalizing tournament: " . $e->getMessage()
             ];
         }
     }
@@ -1245,9 +1371,15 @@ class TournamentService{
             $stmtMatch = $db->prepare("UPDATE matches SET status = 'COMPLETED' WHERE tournament_id = ?");
             $stmtMatch->execute([$tournamentId]);
 
+            // Auto-reject any remaining PENDING requests for this completed tournament
+            $db->prepare("UPDATE tournament_team_requests SET status = 'REJECTED' WHERE tournament_id = ? AND status = 'PENDING'")->execute([$tournamentId]);
+            $db->prepare("UPDATE tournament_referee_requests SET status = 'REJECTED' WHERE tournament_id = ? AND status = 'PENDING'")->execute([$tournamentId]);
+            $db->prepare("UPDATE tournament_sponsor_requests SET status = 'REJECTED' WHERE tournament_id = ? AND status = 'PENDING'")->execute([$tournamentId]);
+            $db->prepare("UPDATE tournament_playground_requests SET status = 'REJECTED' WHERE tournament_id = ? AND status = 'PENDING'")->execute([$tournamentId]);
+
             return [
                 "success" => true,
-                "message" => "Tournament has been successfully completed!"
+                "message" => "Tournament has been successfully completed and all pending requests closed!"
             ];
         } catch (Exception $e) {
             return [

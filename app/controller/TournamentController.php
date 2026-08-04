@@ -154,12 +154,22 @@ class TournamentController{
         echo json_encode($result);
     }
 
-    public function getOrganizerTournaments($organizerId)
+    public function getOrganizerTournaments($organizerId = null)
     {
         header("Content-Type: application/json");
-        $result = $this->tournamentService->getOrganizerTournaments((int) $organizerId);
+        $authPayload = AuthMiddleware::requireRole(['ORGANIZER', 'ADMIN', 'TEAM', 'REFEREE', 'SPONSOR', 'PLAYGROUND']);
+        $authenticatedId = (int)($authPayload['userId'] ?? 0);
+
+        if ($organizerId === null || !is_numeric($organizerId) || (int)$organizerId <= 0) {
+            $targetId = $authenticatedId;
+        } else {
+            $targetId = (int)$organizerId;
+        }
+
+        $result = $this->tournamentService->getOrganizerTournaments($targetId);
         echo json_encode($result);
     }
+
 
     public function getAllTournaments()
     {
@@ -272,10 +282,19 @@ class TournamentController{
         echo json_encode($result);
     }
 
-    public function getPlaygroundIncomingRequests($playgroundUserId)
+    public function getPlaygroundIncomingRequests($playgroundUserId = null)
     {
         header(self::JSON_HEADER);
-        $result = $this->tournamentService->getPlaygroundIncomingRequests((int) $playgroundUserId);
+        $authPayload = AuthMiddleware::getPayload();
+        $authenticatedId = (int)($authPayload['userId'] ?? 0);
+
+        if ($playgroundUserId === null || !is_numeric($playgroundUserId) || (int)$playgroundUserId <= 0) {
+            $targetId = $authenticatedId;
+        } else {
+            $targetId = (int)$playgroundUserId;
+        }
+
+        $result = $this->tournamentService->getPlaygroundIncomingRequests($targetId);
         echo json_encode($result);
     }
 
@@ -300,6 +319,22 @@ class TournamentController{
     {
         header(self::JSON_HEADER);
         $result = $this->tournamentService->getSponsorRequests((int) $tournamentId);
+        echo json_encode($result);
+    }
+
+    public function getOrganizerSponsorRequests($organizerId = null)
+    {
+        header(self::JSON_HEADER);
+        $authPayload = AuthMiddleware::getPayload();
+        $authenticatedId = (int)($authPayload['userId'] ?? 0);
+
+        if ($organizerId === null || !is_numeric($organizerId) || (int)$organizerId <= 0) {
+            $targetId = $authenticatedId;
+        } else {
+            $targetId = (int)$organizerId;
+        }
+
+        $result = $this->tournamentService->getOrganizerSponsorRequests($targetId);
         echo json_encode($result);
     }
 
@@ -354,25 +389,52 @@ class TournamentController{
         echo json_encode($result);
     }
 
-    public function getSponsorIncomingRequests($sponsorUserId)
+    public function getSponsorIncomingRequests($sponsorUserId = null)
     {
         header(self::JSON_HEADER);
-        $result = $this->tournamentService->getSponsorIncomingRequests((int) $sponsorUserId);
+        $authPayload = AuthMiddleware::getPayload();
+        $authenticatedId = (int)($authPayload['userId'] ?? 0);
+
+        if ($sponsorUserId === null || !is_numeric($sponsorUserId) || (int)$sponsorUserId <= 0) {
+            $targetId = $authenticatedId;
+        } else {
+            $targetId = (int)$sponsorUserId;
+        }
+
+        $result = $this->tournamentService->getSponsorIncomingRequests($targetId);
         echo json_encode($result);
     }
 
     // Referee Requests
-    public function getRefereeIncomingRequests($refereeUserId)
+    public function getRefereeIncomingRequests($refereeUserId = null)
     {
         header(self::JSON_HEADER);
-        $result = $this->tournamentService->getRefereeIncomingRequests((int) $refereeUserId);
+        $authPayload = AuthMiddleware::getPayload();
+        $authenticatedId = (int)($authPayload['userId'] ?? 0);
+
+        if ($refereeUserId === null || !is_numeric($refereeUserId) || (int)$refereeUserId <= 0) {
+            $targetId = $authenticatedId;
+        } else {
+            $targetId = (int)$refereeUserId;
+        }
+
+        $result = $this->tournamentService->getRefereeIncomingRequests($targetId);
         echo json_encode($result);
     }
 
-    public function getOrganizerRefereeRequests($organizerId)
+    public function getOrganizerRefereeRequests($organizerId = null)
     {
         header(self::JSON_HEADER);
-        $result = $this->tournamentService->getOrganizerRefereeRequests((int) $organizerId);
+        $authPayload = AuthMiddleware::getPayload();
+        $authenticatedId = (int)($authPayload['userId'] ?? 0);
+
+        if ($organizerId === null || !is_numeric($organizerId) || (int)$organizerId <= 0) {
+            $targetId = $authenticatedId;
+        } else {
+            $targetId = (int)$organizerId;
+        }
+
+        $result = $this->tournamentService->getOrganizerRefereeRequests($targetId);
         echo json_encode($result);
     }
 
@@ -477,10 +539,34 @@ class TournamentController{
         echo json_encode($result);
     }
 
+    public function getRefereeOfficiatingHistory($refereeUserId)
+    {
+        header(self::JSON_HEADER);
+        $result = $this->tournamentService->getRefereeOfficiatingHistory((int) $refereeUserId);
+        echo json_encode($result);
+    }
+
+
     public function getSponsorHistory($sponsorUserId)
     {
         header(self::JSON_HEADER);
         $result = $this->tournamentService->getSponsorHistory((int) $sponsorUserId);
         echo json_encode($result);
     }
+
+    public function getTeamTournamentHistory($teamUserId)
+    {
+        header(self::JSON_HEADER);
+        $result = $this->tournamentService->getTeamTournamentHistory((int) $teamUserId);
+        echo json_encode($result);
+    }
+
+    public function getOrganizerHistory($organizerId)
+    {
+        header(self::JSON_HEADER);
+        $result = $this->tournamentService->getOrganizerHistory((int) $organizerId);
+        echo json_encode($result);
+    }
 }
+
+

@@ -88,25 +88,26 @@ class TournamentRepository{
      * Find approved tournaments, optionally filtered by search text.
      * Uses the existing `title` column from the current project codebase.
      */
-    public function findApprovedTournaments(string $search): array
+    public function findApprovedTournaments(string $search = ""): array
     {
-        if ($search === "") {
-            $sql = "SELECT t.*, o.organization_name, o.contact_number, o.address AS organizer_address 
-                    FROM tournaments t 
-                    LEFT JOIN organizers o ON t.organizer_id = o.user_id 
-                    WHERE t.approval_status = 'APPROVED'";
-            $statement = $this->connection->prepare($sql);
-            $statement->execute();
-
-            return $statement->fetchAll(PDO::FETCH_ASSOC);
+        $searchCond = "";
+        $params = [];
+        if ($search !== "") {
+            $searchCond = " AND t.title LIKE :search";
+            $params[":search"] = "%" . $search . "%";
         }
 
         $sql = "SELECT t.*, o.organization_name, o.contact_number, o.address AS organizer_address 
                 FROM tournaments t 
                 LEFT JOIN organizers o ON t.organizer_id = o.user_id 
-                WHERE t.approval_status = 'APPROVED' AND t.title LIKE :search";
+                WHERE (t.approval_status IS NULL OR t.approval_status = '' OR UPPER(t.approval_status) != 'REJECTED')
+                {$searchCond}
+                ORDER BY t.tournament_id DESC";
+
         $statement = $this->connection->prepare($sql);
-        $statement->bindValue(":search", "%" . $search . "%");
+        foreach ($params as $k => $v) {
+            $statement->bindValue($k, $v);
+        }
         $statement->execute();
 
         return $statement->fetchAll(PDO::FETCH_ASSOC);
