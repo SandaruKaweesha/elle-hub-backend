@@ -453,8 +453,14 @@ class TournamentService{
             $stmtPgCheck = $conn->prepare("SELECT user_id FROM playgrounds WHERE user_id = ?");
             $stmtPgCheck->execute([$playgroundUserId]);
             if (!$stmtPgCheck->fetch()) {
-                $conn->prepare("INSERT INTO playgrounds (user_id) VALUES (?)")->execute([$playgroundUserId]);
+                $stmtU = $conn->prepare("SELECT email FROM users WHERE user_id = ?");
+                $stmtU->execute([$playgroundUserId]);
+                $uRow = $stmtU->fetch(PDO::FETCH_ASSOC);
+                $pgName = $uRow['email'] ?? 'Playground Venue';
+                $conn->prepare("INSERT INTO playgrounds (user_id, playground_name, located_district, location, address, contact_number, area) VALUES (?, ?, 'Sri Lanka', 'Sri Lanka', 'Sri Lanka', 'N/A', '500 Sq. Ft')")->execute([$playgroundUserId, $pgName]);
             }
+
+
 
             // Check if already requested
             $stmt = $conn->prepare("SELECT status FROM tournament_playground_requests WHERE tournament_id = ? AND playground_user_id = ?");
@@ -547,7 +553,33 @@ class TournamentService{
         }
     }
 
+    public function getOrganizerPlaygroundRequests(int $organizerId): array
+    {
+        try {
+            $conn = Database::getConnection();
+            $stmt = $conn->prepare("
+                SELECT tpr.request_id, tpr.tournament_id, tpr.playground_user_id, tpr.request_date, tpr.status, tpr.initiated_by,
+                       t.title AS tournament_title,
+                       COALESCE(p.playground_name, u.email, 'Playground Venue') AS display_name,
+                       COALESCE(p.location, p.located_district, 'Sri Lanka') AS district,
+                       COALESCE(p.contact_number, u.email, 'N/A') AS contact_number,
+                       p.area AS capacity
+                FROM tournament_playground_requests tpr
+                JOIN tournaments t ON tpr.tournament_id = t.tournament_id
+                JOIN users u ON tpr.playground_user_id = u.user_id
+                LEFT JOIN playgrounds p ON tpr.playground_user_id = p.user_id
+                WHERE t.organizer_id = ?
+                ORDER BY tpr.request_date DESC
+            ");
+            $stmt->execute([$organizerId]);
+            return ["success" => true, "data" => $stmt->fetchAll(PDO::FETCH_ASSOC)];
+        } catch (Exception $e) {
+            return ["success" => false, "message" => $e->getMessage()];
+        }
+    }
+
     // Sponsor Requests
+
     public function getSponsorRequests(int $tournamentId): array
     {
         try {
@@ -579,8 +611,14 @@ class TournamentService{
             $stmtSpCheck = $conn->prepare("SELECT user_id FROM sponsors WHERE user_id = ?");
             $stmtSpCheck->execute([$sponsorUserId]);
             if (!$stmtSpCheck->fetch()) {
-                $conn->prepare("INSERT INTO sponsors (user_id) VALUES (?)")->execute([$sponsorUserId]);
+                $stmtU = $conn->prepare("SELECT email FROM users WHERE user_id = ?");
+                $stmtU->execute([$sponsorUserId]);
+                $uRow = $stmtU->fetch(PDO::FETCH_ASSOC);
+                $spName = $uRow['email'] ?? 'Corporate Sponsor';
+                $conn->prepare("INSERT INTO sponsors (user_id, company_name, contact_person, address, contact_number) VALUES (?, ?, 'Sponsor Rep', 'Sri Lanka', 'N/A')")->execute([$sponsorUserId, $spName]);
             }
+
+
 
             // Check if already requested
             $stmt = $conn->prepare("SELECT status FROM tournament_sponsor_requests WHERE tournament_id = ? AND sponsor_user_id = ?");
@@ -602,21 +640,25 @@ class TournamentService{
     {
         try {
             $conn = Database::getConnection();
+            $upperStatus = strtoupper($status);
             
-            if (strtoupper($status) === 'CANCELLED' || strtoupper($status) === 'DELETE') {
+            if ($upperStatus === 'CANCELLED' || $upperStatus === 'DELETE') {
                 $stmt = $conn->prepare("DELETE FROM tournament_sponsor_requests WHERE tournament_id = ? AND sponsor_user_id = ?");
                 $stmt->execute([$tournamentId, $sponsorUserId]);
                 return ["success" => true, "message" => "Sponsorship request cancelled and removed successfully"];
             }
 
-            $stmt = $conn->prepare("UPDATE tournament_sponsor_requests SET status = ? WHERE tournament_id = ? AND sponsor_user_id = ?");
-            $stmt->execute([$status, $tournamentId, $sponsorUserId]);
+            $dbStatus = ($upperStatus === 'APPROVED' || $upperStatus === 'ACCEPTED') ? 'ACCEPTED' : 'REJECTED';
 
-            return ["success" => true, "message" => "Request updated successfully"];
+            $stmt = $conn->prepare("UPDATE tournament_sponsor_requests SET status = ? WHERE tournament_id = ? AND sponsor_user_id = ?");
+            $stmt->execute([$dbStatus, $tournamentId, $sponsorUserId]);
+
+            return ["success" => true, "message" => "Request updated successfully to {$dbStatus}"];
         } catch (Exception $e) {
             return ["success" => false, "message" => $e->getMessage()];
         }
     }
+
 
     public function getSponsorIncomingRequests(int $sponsorUserId): array
     {
@@ -722,8 +764,14 @@ class TournamentService{
             $stmtRefCheck = $conn->prepare("SELECT user_id FROM referees WHERE user_id = ?");
             $stmtRefCheck->execute([$refereeUserId]);
             if (!$stmtRefCheck->fetch()) {
-                $conn->prepare("INSERT INTO referees (user_id) VALUES (?)")->execute([$refereeUserId]);
+                $stmtU = $conn->prepare("SELECT email FROM users WHERE user_id = ?");
+                $stmtU->execute([$refereeUserId]);
+                $uRow = $stmtU->fetch(PDO::FETCH_ASSOC);
+                $refName = $uRow['email'] ?? 'Official Referee';
+                $conn->prepare("INSERT INTO referees (user_id, full_name, experience_years, contact_number, availability_status) VALUES (?, ?, 1, 'N/A', 'AVAILABLE')")->execute([$refereeUserId, $refName]);
             }
+
+
 
             // Check if request already exists to prevent duplicate entry exception
             $stmtCheck = $conn->prepare("SELECT status FROM tournament_referee_requests WHERE tournament_id = ? AND referee_user_id = ?");
@@ -1223,10 +1271,21 @@ class TournamentService{
         }
     }
 
-    public function shuffleTournamentDraw(int $tournamentId, string $mode = 'SYSTEM'): array
+    public function shuffleTournamentDraw(int $tournamentId, string $mode = 'RANDOM'): array
     {
         try {
             $db = Database::getConnection();
+
+            // Check if draw is already finalized/locked
+            $tCheck = $db->prepare("SELECT is_draw_finalized FROM tournaments WHERE tournament_id = ?");
+            $tCheck->execute([$tournamentId]);
+            $tRow = $tCheck->fetch(PDO::FETCH_ASSOC);
+            if ($tRow && (int)($tRow['is_draw_finalized'] ?? 0) === 1) {
+                return [
+                    "success" => false,
+                    "message" => "Tournament match draw is fixed & locked! Further shuffling is not allowed."
+                ];
+            }
 
             $teamStmt = $db->prepare("
                 SELECT u.user_id, u.email, 
@@ -1236,6 +1295,7 @@ class TournamentService{
                 JOIN users u ON ttr.team_user_id = u.user_id
                 LEFT JOIN teams t ON u.user_id = t.user_id
                 WHERE ttr.tournament_id = ? AND (ttr.status = 'APPROVED' OR ttr.status = 'ACCEPTED')
+                ORDER BY u.user_id ASC
             ");
             $teamStmt->execute([$tournamentId]);
             $teams = $teamStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -1244,32 +1304,43 @@ class TournamentService{
                 return ["success" => false, "message" => "No approved participating teams found for match draw."];
             }
 
-            // System Match Drawing Algorithm:
-            // 1. Group teams by district for fair distribution
-            $byDistrict = [];
-            foreach ($teams as $team) {
-                $d = !empty($team['district']) ? $team['district'] : 'Sri Lanka';
-                $byDistrict[$d][] = $team;
-            }
+            $shuffledTeams = $teams;
+            $modeUpper = strtoupper($mode);
 
-            $shuffledTeams = [];
-            $groupA = [];
-            $groupB = [];
-            $toggle = true;
+            // DYNAMIC SHUFFLING MODES FOR ANY TEAM COUNT (N = 2, 4, 6, 8, 12, 16, 32...):
+            // 1. MODE 1 (RANDOM): Standard random shuffle across all N teams
+            // 2. MODE 2 (ALTERNATE): Interleaves halves / swaps team pairings dynamically for any N teams
+            // 3. MODE 3 (REVERSE): Reverses the team lineup array completely for any N teams
 
-            foreach ($byDistrict as $district => $dTeams) {
-                shuffle($dTeams);
-                foreach ($dTeams as $t) {
-                    if ($toggle) {
-                        $groupA[] = $t;
-                    } else {
-                        $groupB[] = $t;
+            if ($modeUpper === 'ALTERNATE' || $modeUpper === 'SWAP' || $modeUpper === 'MODE2') {
+                $count = count($shuffledTeams);
+                if ($count >= 4) {
+                    $half = (int) ceil($count / 2);
+                    $firstHalf = array_slice($shuffledTeams, 0, $half);
+                    $secondHalf = array_slice($shuffledTeams, $half);
+                    
+                    $shuffledTeams = [];
+                    $max = max(count($firstHalf), count($secondHalf));
+                    for ($i = 0; $i < $max; $i++) {
+                        if (isset($secondHalf[$i])) {
+                            $shuffledTeams[] = $secondHalf[$i];
+                        }
+                        if (isset($firstHalf[$i])) {
+                            $shuffledTeams[] = $firstHalf[$i];
+                        }
                     }
-                    $toggle = !$toggle;
+                } else if ($count >= 2) {
+                    $temp = $shuffledTeams[0];
+                    $shuffledTeams[0] = $shuffledTeams[$count - 1];
+                    $shuffledTeams[$count - 1] = $temp;
                 }
+            } else if ($modeUpper === 'REVERSE' || $modeUpper === 'MODE3') {
+                $shuffledTeams = array_reverse($shuffledTeams);
+            } else {
+                // Default: Mode 1 (RANDOM)
+                shuffle($shuffledTeams);
             }
 
-            $shuffledTeams = array_merge($groupA, $groupB);
 
             // Construct Primary Round Match Pairings
             $primaryRoundMatches = [];
@@ -1282,16 +1353,18 @@ class TournamentService{
                     "stage" => "Primary Round",
                     "team1" => $team1,
                     "team2" => $team2,
-                    "winner" => null // Set by organizer after match play
+                    "winner" => null
                 ];
             }
 
             $drawData = [
                 "teams" => $shuffledTeams,
                 "primaryRoundMatches" => $primaryRoundMatches,
-                "shuffleMode" => "SYSTEM_AUTOMATIC",
+                "shuffleMode" => $modeUpper,
                 "drawFormat" => "knockout",
-                "shuffledAt" => date('Y-m-d H:i:s')
+                "shuffledAt" => date('Y-m-d H:i:s'),
+                "bracketWinners" => [],
+                "matchScores" => (object)[]
             ];
 
             $drawDataJson = json_encode($drawData);
@@ -1300,10 +1373,11 @@ class TournamentService{
 
             return [
                 "success" => true,
-                "message" => "Primary round matches and tournament draw scheduled successfully by the system!",
+                "message" => "Tournament match draw shuffled using " . $modeUpper . " mode!",
                 "data" => [
                     "teams" => $shuffledTeams,
-                    "drawData" => $drawData
+                    "drawData" => $drawData,
+                    "isDrawFinalized" => false
                 ]
             ];
         } catch (Exception $e) {
@@ -1314,6 +1388,7 @@ class TournamentService{
         }
     }
 
+
     public function saveTournamentDraw(int $tournamentId, object $request): array
     {
         try {
@@ -1322,6 +1397,13 @@ class TournamentService{
 
             $stmt = $db->prepare("UPDATE tournaments SET is_draw_finalized = 1, draw_data = ? WHERE tournament_id = ?");
             $stmt->execute([$drawDataJson, $tournamentId]);
+
+            // Fetch tournament date for match_date
+            $tStmt = $db->prepare("SELECT tournament_held_date, start_date FROM tournaments WHERE tournament_id = ?");
+            $tStmt->execute([$tournamentId]);
+            $tRow = $tStmt->fetch(PDO::FETCH_ASSOC);
+            $matchDate = !empty($tRow['tournament_held_date']) ? $tRow['tournament_held_date'] : (!empty($tRow['start_date']) ? $tRow['start_date'] : date('Y-m-d'));
+            $matchTime = '09:00:00';
 
             $rawTeams = isset($request->drawData->teams) ? $request->drawData->teams : (isset($request->teams) ? $request->teams : []);
             if (!empty($rawTeams)) {
@@ -1332,25 +1414,22 @@ class TournamentService{
                 $groupA = array_slice($rawTeams, 0, $half);
                 $groupB = array_slice($rawTeams, $half);
 
+                $stmtMatch = $db->prepare("INSERT INTO matches (tournament_id, match_date, match_time, round, status) VALUES (?, ?, ?, ?, 'SCHEDULED')");
+
                 for ($i = 0; $i < count($groupA); $i += 2) {
-                    $stmtMatch = $db->prepare("INSERT INTO matches (tournament_id, round, status) VALUES (?, 'Group A - Quarter Final', 'SCHEDULED')");
-                    $stmtMatch->execute([$tournamentId]);
+                    $stmtMatch->execute([$tournamentId, $matchDate, $matchTime, 'Group A - Quarter Final']);
                 }
                 for ($i = 0; $i < count($groupB); $i += 2) {
-                    $stmtMatch = $db->prepare("INSERT INTO matches (tournament_id, round, status) VALUES (?, 'Group B - Quarter Final', 'SCHEDULED')");
-                    $stmtMatch->execute([$tournamentId]);
+                    $stmtMatch->execute([$tournamentId, $matchDate, $matchTime, 'Group B - Quarter Final']);
                 }
-                $stmtSF1 = $db->prepare("INSERT INTO matches (tournament_id, round, status) VALUES (?, 'Semi Final 1', 'SCHEDULED')");
-                $stmtSF1->execute([$tournamentId]);
-                $stmtSF2 = $db->prepare("INSERT INTO matches (tournament_id, round, status) VALUES (?, 'Semi Final 2', 'SCHEDULED')");
-                $stmtSF2->execute([$tournamentId]);
-                $stmtFinal = $db->prepare("INSERT INTO matches (tournament_id, round, status) VALUES (?, 'Final Match', 'SCHEDULED')");
-                $stmtFinal->execute([$tournamentId]);
+                $stmtMatch->execute([$tournamentId, $matchDate, $matchTime, 'Semi Final 1']);
+                $stmtMatch->execute([$tournamentId, $matchDate, $matchTime, 'Semi Final 2']);
+                $stmtMatch->execute([$tournamentId, $matchDate, $matchTime, 'Final Match']);
             }
 
             return [
                 "success" => true,
-                "message" => "Tournament match draw schedule finalized successfully!"
+                "message" => "Tournament match draw schedule saved and permanently locked successfully! 🔒"
             ];
         } catch (Exception $e) {
             return [
@@ -1359,6 +1438,7 @@ class TournamentService{
             ];
         }
     }
+
 
     public function completeTournament(int $tournamentId): array
     {
