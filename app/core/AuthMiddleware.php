@@ -27,6 +27,22 @@ class AuthMiddleware
     }
 
     /**
+     * Tries to decode JWT payload from header without exiting on failure.
+     * Returns null if token is missing or invalid.
+     */
+    public static function getPayload(): ?array
+    {
+        $headers = self::getAuthorizationHeader();
+        if (!$headers || !preg_match('/Bearer\s(\S+)/', $headers, $matches)) {
+            return null;
+        }
+        $token = $matches[1];
+        $payload = JWT::decode($token, Config::JWT_SECRET);
+        return is_array($payload) ? $payload : null;
+    }
+
+
+    /**
      * Authenticates and checks if the user has one of the allowed roles.
      * Returns the payload if successful, otherwise responds with 401/403 and exits.
      */

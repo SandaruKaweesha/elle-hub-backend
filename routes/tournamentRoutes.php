@@ -204,6 +204,12 @@ $router->post(
     [TournamentController::class, "cancelPlaygroundRequest"]
 );
 
+$router->get(
+    "/organizer/{id}/playground-requests",
+    [TournamentController::class, "getOrganizerPlaygroundRequests"]
+);
+
+
 // Advanced Sponsor Request System
 $router->get(
     "/tournament/{id}/sponsor-requests",
