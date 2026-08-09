@@ -75,6 +75,20 @@ class UserService{
             // Everything succeeded
             Database::commit();
 
+            // Trigger #1: Send notification to Admins for new registration
+            try {
+                require_once __DIR__ . "/NotificationService.php";
+                $notifService = new NotificationService();
+                $notifService->sendToRole(
+                    'admin',
+                    'New Account Registration',
+                    "A new {$user->getRole()} account ({$user->getEmail()}) has registered and requires approval.",
+                    'ACCOUNT'
+                );
+            } catch (Exception $e) {
+                error_log("Notif trigger error: " . $e->getMessage());
+            }
+
             return [
                 "success" => true,
                 "message" => "Registration successful."
@@ -142,6 +156,18 @@ class UserService{
             ];
         }
 
+        // Trigger #3: Send notification to Admins on user deletion
+        try {
+            require_once __DIR__ . "/NotificationService.php";
+            $notifService = new NotificationService();
+            $notifService->sendToRole(
+                'admin',
+                'Account Deleted',
+                "User account {$user['email']} (ID: {$userId}) has been deleted.",
+                'ACCOUNT'
+            );
+        } catch (Exception $e) {}
+
         return [
             "success" => true,
             "message" => "User deleted successfully."
@@ -163,6 +189,18 @@ class UserService{
     {
         $updated = $this->userRepository->updateProfile($userId, $role, $data);
         if ($updated) {
+            // Trigger #4: Send notification to User on Profile Update
+            try {
+                require_once __DIR__ . "/NotificationService.php";
+                $notifService = new NotificationService();
+                $notifService->sendToUser(
+                    $userId,
+                    'Profile Details Updated',
+                    'Your account profile details were updated successfully.',
+                    'ACCOUNT'
+                );
+            } catch (Exception $e) {}
+
             return [
                 "success" => true,
                 "message" => "Profile updated successfully."
@@ -202,6 +240,21 @@ class UserService{
 
         $updated = $this->userRepository->updateStatus($userId, $status);
         if ($updated) {
+            // Trigger #2: Send notification to User on Account Approval
+            if (strtoupper($status) === 'APPROVED' || strtoupper($status) === 'ACTIVE') {
+                try {
+                    require_once __DIR__ . "/NotificationService.php";
+                    $notifService = new NotificationService();
+                    $roleName = $user['role'] ?? 'user';
+                    $notifService->sendToUser(
+                        $userId,
+                        'Account Approved! 🎉',
+                        "Your {$roleName} account has been officially approved by Admin. You now have full access to Elle Hub features.",
+                        'ACCOUNT'
+                    );
+                } catch (Exception $e) {}
+            }
+
             return [
                 "success" => true,
                 "message" => "User status updated to {$status} successfully."
@@ -213,4 +266,5 @@ class UserService{
             "message" => "Failed to update user status."
         ];
     }
+
 }
