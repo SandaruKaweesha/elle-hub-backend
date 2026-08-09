@@ -14,6 +14,7 @@ class PlaygroundRepository {
                 (
                     user_id,
                     playground_name,
+                    located_district,
                     location,
                     address,
                     contact_number,
@@ -23,6 +24,7 @@ class PlaygroundRepository {
                 (
                     :user_id,
                     :playground_name,
+                    :located_district,
                     :location,
                     :address,
                     :contact_number,
@@ -33,11 +35,13 @@ class PlaygroundRepository {
 
         $statement->bindValue(":user_id", $playground->getUserId());
         $statement->bindValue(":playground_name", $playground->getPlaygroundName());
-        $statement->bindValue(":location", $playground->getLocation());
-        $statement->bindValue(":address", $playground->getAddress());
-        $statement->bindValue(":contact_number", $playground->getContactNumber());
-        $statement->bindValue(":area", $playground->getArea());
+        $statement->bindValue(":located_district", $playground->getLocatedDistrict() ?: $playground->getLocation() ?: 'General');
+        $statement->bindValue(":location", $playground->getLocation() ?: 'N/A');
+        $statement->bindValue(":address", $playground->getAddress() ?: 'N/A');
+        $statement->bindValue(":contact_number", $playground->getContactNumber() ?: 'N/A');
+        $statement->bindValue(":area", $playground->getArea() ?: '500 Sq. Ft');
 
         return $statement->execute();
     }
+
 }

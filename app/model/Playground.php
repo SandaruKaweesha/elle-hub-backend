@@ -6,6 +6,7 @@ require_once "User.php";
 class Playground extends User
 {
     private $playgroundName;
+    private $locatedDistrict;
     private $location;
     private $address;
     private $contactNumber;
@@ -24,6 +25,7 @@ class Playground extends User
         $lastLogin = null,
         $createdAt = null,
         $playgroundName = null,
+        $locatedDistrict = null,
         $location = null,
         $address = null,
         $contactNumber = null,
@@ -45,6 +47,7 @@ class Playground extends User
         );
 
         $this->playgroundName = $playgroundName;
+        $this->locatedDistrict = $locatedDistrict;
         $this->location = $location;
         $this->address = $address;
         $this->contactNumber = $contactNumber;
@@ -56,6 +59,11 @@ class Playground extends User
     public function getPlaygroundName()
     {
         return $this->playgroundName;
+    }
+
+    public function getLocatedDistrict()
+    {
+        return $this->locatedDistrict;
     }
 
     public function getLocation()
@@ -85,6 +93,11 @@ class Playground extends User
         $this->playgroundName = $playgroundName;
     }
 
+    public function setLocatedDistrict($locatedDistrict)
+    {
+        $this->locatedDistrict = $locatedDistrict;
+    }
+
     public function setLocation($location)
     {
         $this->location = $location;
@@ -104,4 +117,4 @@ class Playground extends User
     {
         $this->area = $area;
     }
-}
+}
