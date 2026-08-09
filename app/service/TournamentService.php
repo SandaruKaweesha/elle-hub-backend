@@ -25,11 +25,24 @@ class TournamentService{
 
             Database::commit();
 
+            // Trigger #5: Send notification to Admins for new tournament creation
+            try {
+                require_once __DIR__ . "/NotificationService.php";
+                $notifService = new NotificationService();
+                $notifService->sendToRole(
+                    'admin',
+                    'New Tournament Approval Request',
+                    "A new tournament '{$tournament->getTitle()}' has been created and requires admin review & approval.",
+                    'TOURNAMENT'
+                );
+            } catch (Exception $e) {}
+
             return [
                 "success" => true,
                 "message" => "Tournament created successfully.",
                 "data" => ["tournamentId" => $tournamentId]
             ];
+
         } catch (Exception $e) {
             Database::rollback();
             return [
@@ -186,10 +199,26 @@ class TournamentService{
             ];
         }
 
+        // Trigger #6: Broadcast notification to ALL USERS on Tournament Approval
+        if (strtoupper($approvalStatus) === 'APPROVED') {
+            try {
+                require_once __DIR__ . "/NotificationService.php";
+                $notifService = new NotificationService();
+                $title = $tournament['title'] ?? 'Elle Championship';
+                $location = $tournament['location'] ?? 'Central Grounds';
+                $notifService->sendToAll(
+                    "New Championship Announced! 🏆",
+                    "The '{$title}' tournament at {$location} has been officially approved and is now open for registration!",
+                    "TOURNAMENT"
+                );
+            } catch (Exception $e) {}
+        }
+
         return [
             "success" => true,
             "message" => "Tournament approval status updated successfully."
         ];
+
     }
 
 
@@ -1427,6 +1456,20 @@ class TournamentService{
                 $stmtMatch->execute([$tournamentId, $matchDate, $matchTime, 'Final Match']);
             }
 
+            // Trigger #7: Send Notification on Tournament Setup Finalization
+            try {
+                require_once __DIR__ . "/NotificationService.php";
+                $notifService = new NotificationService();
+                $tStmt2 = $db->prepare("SELECT title FROM tournaments WHERE tournament_id = ?");
+                $tStmt2->execute([$tournamentId]);
+                $tTitle = $tStmt2->fetchColumn() ?: "Championship";
+                $notifService->sendToAll(
+                    "Match Schedule Live! ⚡",
+                    "Setup and match schedule for tournament '{$tTitle}' is finalized. Check your match fixtures!",
+                    "TOURNAMENT"
+                );
+            } catch (Exception $e) {}
+
             return [
                 "success" => true,
                 "message" => "Tournament match draw schedule saved and permanently locked successfully! 🔒"
@@ -1457,6 +1500,24 @@ class TournamentService{
             $db->prepare("UPDATE tournament_sponsor_requests SET status = 'REJECTED' WHERE tournament_id = ? AND status = 'PENDING'")->execute([$tournamentId]);
             $db->prepare("UPDATE tournament_playground_requests SET status = 'REJECTED' WHERE tournament_id = ? AND status = 'PENDING'")->execute([$tournamentId]);
 
+            // Trigger #8: Broadcast Champion Winner Announcement on Tournament Completion
+            try {
+                require_once __DIR__ . "/NotificationService.php";
+                $notifService = new NotificationService();
+                $tStmt = $db->prepare("SELECT title, draw_data FROM tournaments WHERE tournament_id = ?");
+                $tStmt->execute([$tournamentId]);
+                $tRow = $tStmt->fetch(PDO::FETCH_ASSOC);
+                $title = $tRow['title'] ?? 'Elle Championship';
+                $drawData = !empty($tRow['draw_data']) ? json_decode($tRow['draw_data'], true) : [];
+                $winner = $drawData['winner'] ?? $drawData['bracketWinners']['champion'] ?? 'Winner Team';
+
+                $notifService->sendToAll(
+                    "Championship Winner Announced! 🏆",
+                    "The {$title} championship has concluded! Congratulations to {$winner} for winning the tournament!",
+                    "TOURNAMENT"
+                );
+            } catch (Exception $e) {}
+
             return [
                 "success" => true,
                 "message" => "Tournament has been successfully completed and all pending requests closed!"
@@ -1468,4 +1529,5 @@ class TournamentService{
             ];
         }
     }
+
 }

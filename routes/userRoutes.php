@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . "/../app/controller/UserController.php";
+require_once __DIR__ . "/../app/controller/NotificationController.php";
 
 
 // POST http://localhost/elle-hub-backend/user/register
@@ -36,8 +37,8 @@ $router->get(
 //GET http://localhost/elle-hub-backend/user/5
 $router->get(
     "/user/{id}",
-    [UserController::class, "getUserById"]);
-
+    [UserController::class, "getUserById"]
+);
 
 // PUT http://localhost/elle-hub-backend/user/update
 $router->put(
@@ -50,7 +51,6 @@ $router->put(
     "/user/updatePassword",
     [UserController::class, "updatePassword"]
 );
-
 
 // DELETE http://localhost/elle-hub-backend/user/delete/5
 $router->delete(
@@ -68,4 +68,20 @@ $router->post(
 $router->post(
     "/user/request-deletion",
     [UserController::class, "requestDeletion"]
+);
+
+// --- NOTIFICATION ENDPOINTS ---
+$router->get(
+    "/user/{id}/notifications",
+    [NotificationController::class, "getUserNotifications"]
+);
+
+$router->put(
+    "/user/{id}/notifications/{notifId}/read",
+    [NotificationController::class, "markAsRead"]
+);
+
+$router->put(
+    "/user/{id}/notifications/read-all",
+    [NotificationController::class, "markAllAsRead"]
 );
