@@ -50,12 +50,14 @@ class UserController{
 
             case "PLAYGROUND":
                 $user = new Playground();
-                $user->setPlaygroundName($requestObject->playgroundName);
-                $user->setLocation($requestObject->location);
-                $user->setAddress($requestObject->address);
-                $user->setContactNumber($requestObject->contactNumber);
+                $user->setPlaygroundName($requestObject->playgroundName ?? 'Elle Playground');
+                $user->setLocatedDistrict($requestObject->district ?? $requestObject->locatedDistrict ?? $requestObject->location ?? 'General');
+                $user->setLocation($requestObject->location ?? $requestObject->address ?? 'General');
+                $user->setAddress($requestObject->address ?? $requestObject->location ?? 'N/A');
+                $user->setContactNumber($requestObject->contactNumber ?? 'N/A');
                 $user->setArea($requestObject->area ?? $requestObject->capacity ?? '500 Sq. Ft');
                 break;
+
 
             case "REFEREE":
                 $user = new Referee();

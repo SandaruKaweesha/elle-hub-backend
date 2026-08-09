@@ -101,6 +101,8 @@ class TournamentRepository{
                 FROM tournaments t 
                 LEFT JOIN organizers o ON t.organizer_id = o.user_id 
                 WHERE (t.approval_status IS NULL OR t.approval_status = '' OR UPPER(t.approval_status) != 'REJECTED')
+                  AND (t.status IS NULL OR t.status = '' OR (UPPER(t.status) != 'COMPLETED' AND UPPER(t.status) != 'FINISHED'))
+
                 {$searchCond}
                 ORDER BY t.tournament_id DESC";
 
