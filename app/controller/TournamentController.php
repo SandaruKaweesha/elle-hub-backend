@@ -29,6 +29,9 @@ class TournamentController{
         $tournament->setMaximumRefereeLimit($requestObject->maximumRefereeLimit ?? $requestObject->requiredReferees ?? 2);
         $tournament->setRules($requestObject->rules ?? null);
         $tournament->setPrizeDetails($requestObject->prizeDetails ?? null);
+        if (isset($requestObject->imageUrl) || isset($requestObject->image_url)) {
+            $tournament->setImageUrl($requestObject->imageUrl ?? $requestObject->image_url);
+        }
 
         $result = $this->tournamentService->createTournament($tournament);
 

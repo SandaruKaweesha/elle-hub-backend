@@ -10,10 +10,10 @@ class Database
 
             // Local MySQL 8 connection
             $host = "127.0.0.1";
-            $port = "3306";
+            $port = "3307";
             $database = "ellehub"; // Change if your local DB has a different name
             $username = "root";
-            $password = "1234";
+            $password = "";
 
             $dsn = "mysql:host=$host;port=$port;dbname=$database;charset=utf8mb4";
 

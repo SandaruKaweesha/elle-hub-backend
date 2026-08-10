@@ -78,6 +78,9 @@ class UserController{
         $user->setEmail($requestObject->email);
         $user->setPassword($requestObject->password);
         $user->setRole($requestObject->role);
+        if (isset($requestObject->profilePicture) || isset($requestObject->profile_picture)) {
+            $user->setProfilePicture($requestObject->profilePicture ?? $requestObject->profile_picture);
+        }
 
         $result=$this->userService->registerUser($user);
 
