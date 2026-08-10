@@ -552,7 +552,7 @@ class TournamentService{
             $conn = Database::getConnection();
             $stmt = $conn->prepare("
                 SELECT tpr.request_id, tpr.tournament_id, tpr.playground_user_id, tpr.request_date, tpr.status, tpr.initiated_by,
-                       t.title AS tournament_title, t.location, t.start_date, t.end_date, t.tournament_held_date,
+                       t.status AS tournament_status, t.title AS tournament_title, t.location, t.start_date, t.end_date, t.tournament_held_date,
                        COALESCE(o.organization_name, 'Elle Sports Association') AS organizer_name,
                        COALESCE(o.contact_number, 'Available on Request') AS contact_number
                 FROM tournament_playground_requests tpr
