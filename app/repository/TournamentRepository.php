@@ -14,6 +14,24 @@ class TournamentRepository{
      * Uses named parameters and PDO prepared statements
      */
     public function save(Tournament $tournament): int{
+        $imageUrl = $tournament->getImageUrl();
+        if (empty($imageUrl)) {
+            try {
+                $photoStmt = $this->connection->query("SELECT image_url FROM system_photos WHERE category = 'TOURNAMENT_COVER' ORDER BY photo_id ASC");
+                $allPhotos = $photoStmt->fetchAll(PDO::FETCH_COLUMN);
+
+                if (!empty($allPhotos)) {
+                    $countStmt = $this->connection->query("SELECT COUNT(*) FROM tournaments");
+                    $count = (int) $countStmt->fetchColumn();
+                    $imageUrl = $allPhotos[$count % count($allPhotos)];
+                } else {
+                    $imageUrl = "/images/tournament-1.png";
+                }
+            } catch (Exception $e) {
+                $imageUrl = "/images/tournament-1.png";
+            }
+        }
+
         $sql = "INSERT INTO tournaments (
             organizer_id,
             title,
@@ -27,6 +45,7 @@ class TournamentRepository{
             rules,
             prize_details,
             approval_status,
+            image_url,
             created_at
         ) VALUES (
             :organizer_id,
@@ -41,6 +60,7 @@ class TournamentRepository{
             :rules,
             :prize_details,
             :approval_status,
+            :image_url,
             NOW()
         )";
 
@@ -58,6 +78,7 @@ class TournamentRepository{
         $statement->bindValue(":rules", $tournament->getRules());
         $statement->bindValue(":prize_details", $tournament->getPrizeDetails());
         $statement->bindValue(":approval_status", $tournament->getApprovalStatus());
+        $statement->bindValue(":image_url", $imageUrl);
 
         $statement->execute();
 

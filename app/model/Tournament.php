@@ -225,6 +225,18 @@ class Tournament
         $this->createdAt = $createdAt;
     }
 
+    private $imageUrl;
+
+    public function getImageUrl()
+    {
+        return $this->imageUrl;
+    }
+
+    public function setImageUrl($imageUrl)
+    {
+        $this->imageUrl = $imageUrl;
+    }
+
     public function getTournamentHeldDate()
     {
         return $this->tournamentHeldDate;
