@@ -69,7 +69,9 @@ class AuthService
                 "id" => $user->getUserId(),
                 "email" => $user->getEmail(),
                 "role" => $role,
-                "status" => $user->getStatus()
+                "status" => $user->getStatus(),
+                "profilePicture" => $user->getProfilePicture(),
+                "profile_picture" => $user->getProfilePicture()
             ]
         ];
     }

@@ -19,8 +19,8 @@ class UserRepository{
     }
 
     public function save(User $user):int{
-        $sql = "INSERT INTO users (email, password, role, status)
-            VALUES (:email, :password, :role, :status)";
+        $sql = "INSERT INTO users (email, password, role, status, profile_picture)
+            VALUES (:email, :password, :role, :status, :profile_picture)";
 
         $statement = $this->connection->prepare($sql);
 
@@ -28,6 +28,7 @@ class UserRepository{
         $statement->bindValue(":password", $user->getPassword());
         $statement->bindValue(":role", $user->getRole());
         $statement->bindValue(":status", $user->getStatus());
+        $statement->bindValue(":profile_picture", $user->getProfilePicture());
 
         $statement->execute();
 
@@ -154,6 +155,9 @@ class UserRepository{
                     if (isset($roleData['company_name'])) $user['companyName'] = $roleData['company_name'];
                     if (isset($roleData['team_name'])) $user['teamName'] = $roleData['team_name'];
                     if (isset($roleData['playground_name'])) $user['playgroundName'] = $roleData['playground_name'];
+                }
+                if (isset($user['profile_picture'])) {
+                    $user['profilePicture'] = $user['profile_picture'];
                 }
 
                 if ($role === 'TEAM') {
