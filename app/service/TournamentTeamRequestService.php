@@ -13,8 +13,21 @@ class TournamentTeamRequestService
 
     public function submitRequest(int $tournamentId, int $teamUserId): array
     {
-        // 0. Check team user account approval status from users table
         $conn = Database::getConnection();
+
+        // 0. Check tournament approval status by Admin
+        $stmtApp = $conn->prepare("SELECT approval_status FROM tournaments WHERE tournament_id = ?");
+        $stmtApp->execute([$tournamentId]);
+        $appStatus = $stmtApp->fetchColumn();
+
+        if (strtoupper((string)$appStatus) !== 'APPROVED') {
+            return [
+                "success" => false,
+                "message" => "Tournament is pending admin approval. Requests and invitations cannot be processed until the tournament is approved by an admin."
+            ];
+        }
+
+        // 0b. Check team user account approval status from users table
         $stmtStatus = $conn->prepare("SELECT status FROM users WHERE user_id = ?");
         $stmtStatus->execute([$teamUserId]);
         $userStatus = $stmtStatus->fetchColumn();
@@ -52,6 +65,20 @@ class TournamentTeamRequestService
 
     public function sendOrganizerInvitation(int $tournamentId, int $teamUserId): array
     {
+        $conn = Database::getConnection();
+
+        // 0. Check tournament approval status by Admin
+        $stmtApp = $conn->prepare("SELECT approval_status FROM tournaments WHERE tournament_id = ?");
+        $stmtApp->execute([$tournamentId]);
+        $appStatus = $stmtApp->fetchColumn();
+
+        if (strtoupper((string)$appStatus) !== 'APPROVED') {
+            return [
+                "success" => false,
+                "message" => "Tournament is pending admin approval. Requests and invitations cannot be processed until the tournament is approved by an admin."
+            ];
+        }
+
         // 1. Check if a request/invitation already exists
         $existing = $this->repository->findByKeys($tournamentId, $teamUserId);
         if ($existing) {
