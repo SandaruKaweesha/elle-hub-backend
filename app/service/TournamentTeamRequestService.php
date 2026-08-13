@@ -13,6 +13,19 @@ class TournamentTeamRequestService
 
     public function submitRequest(int $tournamentId, int $teamUserId): array
     {
+        // 0. Check team user account approval status from users table
+        $conn = Database::getConnection();
+        $stmtStatus = $conn->prepare("SELECT status FROM users WHERE user_id = ?");
+        $stmtStatus->execute([$teamUserId]);
+        $userStatus = $stmtStatus->fetchColumn();
+
+        if (strtoupper((string)$userStatus) !== 'APPROVED') {
+            return [
+                "success" => false,
+                "message" => "Your team account registration is currently pending admin approval. You cannot apply for tournaments until an admin approves your account."
+            ];
+        }
+
         // 1. Check if a request already exists
         $existing = $this->repository->findByKeys($tournamentId, $teamUserId);
         if ($existing) {

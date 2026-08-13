@@ -789,6 +789,18 @@ class TournamentService{
         try {
             $conn = Database::getConnection();
 
+            // Check if referee user account is approved by Admin
+            $stmtUserStatus = $conn->prepare("SELECT status FROM users WHERE user_id = ?");
+            $stmtUserStatus->execute([$refereeUserId]);
+            $userStatus = $stmtUserStatus->fetchColumn();
+
+            if (strtoupper((string)$userStatus) !== 'APPROVED') {
+                return [
+                    "success" => false,
+                    "message" => "Your referee account registration is currently pending admin approval. You cannot apply for tournaments until an admin approves your account."
+                ];
+            }
+
             // Ensure referee record exists in referees table to satisfy FK constraint fk_ref_request_referee
             $stmtRefCheck = $conn->prepare("SELECT user_id FROM referees WHERE user_id = ?");
             $stmtRefCheck->execute([$refereeUserId]);
