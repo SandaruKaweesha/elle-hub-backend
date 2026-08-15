@@ -121,7 +121,7 @@ class TournamentRepository{
         $sql = "SELECT t.*, o.organization_name, o.contact_number, o.address AS organizer_address 
                 FROM tournaments t 
                 LEFT JOIN organizers o ON t.organizer_id = o.user_id 
-                WHERE (t.approval_status IS NULL OR t.approval_status = '' OR UPPER(t.approval_status) != 'REJECTED')
+                WHERE UPPER(t.approval_status) = 'APPROVED'
                   AND (t.status IS NULL OR t.status = '' OR (UPPER(t.status) != 'COMPLETED' AND UPPER(t.status) != 'FINISHED'))
 
                 {$searchCond}
@@ -352,6 +352,7 @@ class TournamentRepository{
         $sql = "SELECT t.*, o.organization_name AS organizer_name
                 FROM tournaments t
                 LEFT JOIN organizers o ON t.organizer_id = o.user_id
+                WHERE UPPER(t.approval_status) = 'APPROVED'
                 ORDER BY t.created_at DESC";
 
         $statement = $this->connection->prepare($sql);

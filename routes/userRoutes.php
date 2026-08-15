@@ -2,6 +2,14 @@
 
 require_once __DIR__ . "/../app/controller/UserController.php";
 require_once __DIR__ . "/../app/controller/NotificationController.php";
+require_once __DIR__ . "/../app/controller/TeamController.php";
+
+
+// GET http://localhost/elle-hub-backend/teams/rankings
+$router->get(
+    "/teams/rankings",
+    [TeamController::class, "getTeamRankings"]
+);
 
 
 // POST http://localhost/elle-hub-backend/user/register

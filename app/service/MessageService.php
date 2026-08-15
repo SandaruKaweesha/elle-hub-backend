@@ -5,6 +5,29 @@ require_once __DIR__ . "/../../config/Database.php";
 class MessageService
 {
     /**
+     * Check if there is an ACCEPTED or APPROVED tournament sponsorship request between organizer and sponsor
+     */
+    public function hasAcceptedSponsorship(int $user1Id, int $user2Id): bool
+    {
+        try {
+            $conn = Database::getConnection();
+            $stmt = $conn->prepare("
+                SELECT COUNT(*) 
+                FROM tournament_sponsor_requests tsr
+                JOIN tournaments t ON tsr.tournament_id = t.tournament_id
+                WHERE ((t.organizer_id = ? AND tsr.sponsor_user_id = ?)
+                    OR (t.organizer_id = ? AND tsr.sponsor_user_id = ?))
+                  AND UPPER(tsr.status) IN ('ACCEPTED', 'APPROVED')
+            ");
+            $stmt->execute([$user1Id, $user2Id, $user2Id, $user1Id]);
+            $count = (int)$stmt->fetchColumn();
+            return $count > 0;
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+
+    /**
      * Get messaging contacts for a user (Only Sponsors <-> Organizers allowed)
      */
     public function getContacts(int $userId): array
@@ -66,9 +89,11 @@ class MessageService
             $stmtContacts->execute([$userId]);
             $contacts = $stmtContacts->fetchAll(PDO::FETCH_ASSOC);
 
-            // Fetch latest message and unread count for each contact
+            // Fetch latest message, unread count, and sponsorship status for each contact
             foreach ($contacts as &$contact) {
                 $otherId = (int)$contact['user_id'];
+                $canMessage = $this->hasAcceptedSponsorship($userId, $otherId);
+                $contact['can_message'] = $canMessage;
 
                 // Latest message
                 $stmtMsg = $conn->prepare("
@@ -91,7 +116,7 @@ class MessageService
                 $stmtUnread->execute([$otherId, $userId]);
                 $unreadRow = $stmtUnread->fetch(PDO::FETCH_ASSOC);
 
-                $contact['last_message'] = $lastMsg ? $lastMsg['content'] : "No message history yet";
+                $contact['last_message'] = $lastMsg ? $lastMsg['content'] : ($canMessage ? "No message history yet" : "Sponsorship request pending acceptance");
                 $contact['last_message_time'] = $lastMsg ? $lastMsg['sent_at'] : null;
                 $contact['unread_count'] = (int)($unreadRow['unread_count'] ?? 0);
                 $contact['avatar'] = "https://api.dicebear.com/7.x/avataaars/svg?seed=" . urlencode($contact['display_name']) . "&backgroundColor=eaf1ec";
@@ -158,7 +183,14 @@ class MessageService
             $stmtMsgs->execute([$userId, $otherUserId, $otherUserId, $userId]);
             $messages = $stmtMsgs->fetchAll(PDO::FETCH_ASSOC);
 
-            return ["success" => true, "data" => $messages];
+            $canMessage = $this->hasAcceptedSponsorship($userId, $otherUserId);
+
+            return [
+                "success" => true, 
+                "data" => $messages,
+                "can_message" => $canMessage,
+                "lock_message" => $canMessage ? null : "Messaging is locked until the sponsor accepts the tournament sponsorship request."
+            ];
 
         } catch (Exception $e) {
             return ["success" => false, "message" => $e->getMessage()];
@@ -201,6 +233,14 @@ class MessageService
                 return [
                     "success" => false,
                     "message" => "Direct messaging is allowed strictly between Tournament Organizers and Sponsors."
+                ];
+            }
+
+            // Check if sponsor has accepted the tournament sponsorship request
+            if (!$this->hasAcceptedSponsorship($senderId, $receiverId)) {
+                return [
+                    "success" => false,
+                    "message" => "Messaging is locked until the sponsor accepts the tournament sponsorship request."
                 ];
             }
 

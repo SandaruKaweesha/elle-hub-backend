@@ -636,6 +636,18 @@ class TournamentService{
         try {
             $conn = Database::getConnection();
 
+            // Check tournament approval status by Admin
+            $stmtApp = $conn->prepare("SELECT approval_status FROM tournaments WHERE tournament_id = ?");
+            $stmtApp->execute([$tournamentId]);
+            $appStatus = $stmtApp->fetchColumn();
+
+            if (strtoupper((string)$appStatus) !== 'APPROVED') {
+                return [
+                    "success" => false,
+                    "message" => "Tournament is pending admin approval. Requests and invitations cannot be processed until the tournament is approved by an admin."
+                ];
+            }
+
             // Ensure sponsor record exists in sponsors table to satisfy FK constraint fk_sponsor_request_sponsor
             $stmtSpCheck = $conn->prepare("SELECT user_id FROM sponsors WHERE user_id = ?");
             $stmtSpCheck->execute([$sponsorUserId]);
@@ -788,6 +800,30 @@ class TournamentService{
     {
         try {
             $conn = Database::getConnection();
+
+            // Check tournament approval status by Admin
+            $stmtApp = $conn->prepare("SELECT approval_status FROM tournaments WHERE tournament_id = ?");
+            $stmtApp->execute([$tournamentId]);
+            $appStatus = $stmtApp->fetchColumn();
+
+            if (strtoupper((string)$appStatus) !== 'APPROVED') {
+                return [
+                    "success" => false,
+                    "message" => "Tournament is pending admin approval. Requests and invitations cannot be processed until the tournament is approved by an admin."
+                ];
+            }
+
+            // Check if referee user account is approved by Admin
+            $stmtUserStatus = $conn->prepare("SELECT status FROM users WHERE user_id = ?");
+            $stmtUserStatus->execute([$refereeUserId]);
+            $userStatus = $stmtUserStatus->fetchColumn();
+
+            if (strtoupper((string)$userStatus) !== 'APPROVED') {
+                return [
+                    "success" => false,
+                    "message" => "Your referee account registration is currently pending admin approval. You cannot apply for tournaments until an admin approves your account."
+                ];
+            }
 
             // Ensure referee record exists in referees table to satisfy FK constraint fk_ref_request_referee
             $stmtRefCheck = $conn->prepare("SELECT user_id FROM referees WHERE user_id = ?");
