@@ -17,4 +17,12 @@ class TeamController
         $result = $this->teamService->getTeamRankings();
         echo json_encode($result);
     }
+
+    public function getTeamStats($userId)
+    {
+        header("Content-Type: application/json");
+        $result = $this->teamService->getTeamStats((int) $userId);
+        echo json_encode($result);
+    }
 }
+
