@@ -11,6 +11,13 @@ $router->get(
     [TeamController::class, "getTeamRankings"]
 );
 
+// GET http://localhost/elle-hub-backend/team/{id}/stats
+$router->get(
+    "/team/{id}/stats",
+    [TeamController::class, "getTeamStats"]
+);
+
+
 
 // POST http://localhost/elle-hub-backend/user/register
 $router->post(

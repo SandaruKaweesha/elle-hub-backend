@@ -57,4 +57,21 @@ class TeamService
             ];
         }
     }
+
+    public function getTeamStats(int $userId): array
+    {
+        try {
+            $stats = $this->teamRepository->getTeamStats($userId);
+            return [
+                "success" => true,
+                "data" => $stats
+            ];
+        } catch (Exception $e) {
+            return [
+                "success" => false,
+                "message" => "Failed to retrieve team stats: " . $e->getMessage()
+            ];
+        }
+    }
 }
+
