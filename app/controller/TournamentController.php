@@ -27,11 +27,19 @@ class TournamentController{
         $tournament->setTournamentHeldDate($requestObject->tournamentHeldDate ?? null);
         $tournament->setMaximumTeamLimit($requestObject->maximumTeamLimit ?? null);
         $tournament->setMaximumRefereeLimit($requestObject->maximumRefereeLimit ?? $requestObject->requiredReferees ?? 2);
+        $imageUrl = $requestObject->imageUrl ?? $requestObject->image_url ?? null;
+        if (empty($imageUrl) || trim((string)$imageUrl) === '') {
+            $randomNum = rand(1, 5);
+            $imageUrl = "/images/elle{$randomNum}.jpeg";
+        }
+        $tournament->setImageUrl($imageUrl);
+
         $tournament->setRules($requestObject->rules ?? null);
         $tournament->setPrizeDetails($requestObject->prizeDetails ?? null);
         if (isset($requestObject->imageUrl) || isset($requestObject->image_url)) {
             $tournament->setImageUrl($requestObject->imageUrl ?? $requestObject->image_url);
         }
+
 
         $result = $this->tournamentService->createTournament($tournament);
 

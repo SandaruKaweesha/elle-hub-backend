@@ -78,11 +78,10 @@ class UserController{
         $user->setEmail($requestObject->email);
         $user->setPassword($requestObject->password);
         $user->setRole($requestObject->role);
-        if (isset($requestObject->profilePicture) || isset($requestObject->profile_picture)) {
-            $user->setProfilePicture($requestObject->profilePicture ?? $requestObject->profile_picture);
-        }
+        $user->setProfilePicture($requestObject->profilePicture ?? $requestObject->profile_picture ?? null);
 
         $result=$this->userService->registerUser($user);
+
 
         echo json_encode($result);
     }
@@ -225,4 +224,12 @@ class UserController{
         $result = $this->userService->getUserById($userId);
         echo json_encode($result);
     }
+
+    public function getTeamRankings()
+    {
+        header("Content-Type: application/json");
+        $result = $this->userService->getTeamRankings();
+        echo json_encode($result);
+    }
 }
+

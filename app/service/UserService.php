@@ -267,4 +267,51 @@ class UserService{
         ];
     }
 
+    public function getTeamRankings(): array
+    {
+        try {
+            $conn = Database::getConnection();
+            $sql = "
+                SELECT 
+                    t.user_id AS id,
+                    t.user_id,
+                    t.team_name AS name,
+                    t.team_name,
+                    COALESCE(t.district, 'General') AS district,
+                    COALESCE(t.rating, 0) AS rating,
+                    COALESCE(t.contact_number, '') AS contact_number,
+                    (SELECT COUNT(*) FROM tournament_team_requests ttr WHERE ttr.team_user_id = t.user_id AND ttr.status = 'APPROVED') AS played,
+                    (SELECT COUNT(*) FROM tournament_team_requests ttr WHERE ttr.team_user_id = t.user_id AND ttr.status = 'APPROVED') AS won,
+                    (
+                        ((SELECT COUNT(*) FROM tournament_team_requests ttr WHERE ttr.team_user_id = t.user_id AND ttr.status = 'APPROVED') * 3)
+                        + COALESCE(ROUND(t.rating * 10), 0)
+                    ) AS points
+                FROM teams t
+                JOIN users u ON t.user_id = u.user_id
+                WHERE (u.status IS NULL OR u.status = '' OR UPPER(u.status) = 'APPROVED')
+                ORDER BY points DESC, t.team_name ASC
+            ";
+            $stmt = $conn->query($sql);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($rows as $index => &$row) {
+                $row['rank'] = $index + 1;
+                $row['trend'] = 'same';
+                $row['played'] = (int)($row['played'] ?? 0);
+                $row['won'] = (int)($row['won'] ?? 0);
+                $row['points'] = (int)($row['points'] ?? 0);
+            }
+
+            return [
+                "success" => true,
+                "data" => $rows
+            ];
+        } catch (Exception $e) {
+            return [
+                "success" => false,
+                "message" => "Failed to fetch rankings: " . $e->getMessage()
+            ];
+        }
+    }
 }
+

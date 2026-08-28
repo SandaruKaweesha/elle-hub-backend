@@ -38,7 +38,17 @@ class TournamentTeamRequestRepository
         $statement->bindValue(":team_user_id", $teamUserId, PDO::PARAM_INT);
         $statement->execute();
 
-        return $statement->fetchAll(PDO::FETCH_ASSOC);
+        $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($rows as &$row) {
+            $row['tournamentId'] = $row['tournament_id'];
+            $row['teamUserId'] = $row['team_user_id'];
+            $row['requestDate'] = $row['request_date'];
+            $row['initiatedBy'] = $row['initiated_by'];
+            $row['tournamentTitle'] = $row['tournament_title'];
+            $row['tournamentStatus'] = $row['tournament_status'];
+            $row['tournamentHeldDate'] = $row['tournament_held_date'];
+        }
+        return $rows;
     }
 
     public function findByKeys(int $tournamentId, int $teamUserId): ?array
@@ -55,6 +65,13 @@ class TournamentTeamRequestRepository
         $statement->execute();
 
         $result = $statement->fetch(PDO::FETCH_ASSOC);
+        if ($result) {
+            $result['tournamentId'] = $result['tournament_id'];
+            $result['teamUserId'] = $result['team_user_id'];
+            $result['requestDate'] = $result['request_date'];
+            $result['initiatedBy'] = $result['initiated_by'];
+            $result['tournamentStatus'] = $result['tournament_status'];
+        }
         return $result ? $result : null;
     }
 
@@ -104,7 +121,18 @@ class TournamentTeamRequestRepository
         $statement->bindValue(":organizer_id", $organizerId, PDO::PARAM_INT);
         $statement->execute();
 
-        return $statement->fetchAll(PDO::FETCH_ASSOC);
+        $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($rows as &$row) {
+            $row['tournamentId'] = $row['tournament_id'];
+            $row['teamUserId'] = $row['team_user_id'];
+            $row['requestDate'] = $row['request_date'];
+            $row['initiatedBy'] = $row['initiated_by'];
+            $row['tournamentTitle'] = $row['tournament_title'];
+            $row['teamName'] = $row['team_name'];
+            $row['contactNumber'] = $row['contact_number'];
+            $row['squadSize'] = $row['squad_size'];
+        }
+        return $rows;
     }
 
     public function findByTournamentId(int $tournamentId): array
@@ -128,6 +156,18 @@ class TournamentTeamRequestRepository
         $statement->bindValue(":tournament_id", $tournamentId, PDO::PARAM_INT);
         $statement->execute();
 
-        return $statement->fetchAll(PDO::FETCH_ASSOC);
+        $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($rows as &$row) {
+            $row['tournamentId'] = $row['tournament_id'];
+            $row['teamUserId'] = $row['team_user_id'];
+            $row['requestDate'] = $row['request_date'];
+            $row['initiatedBy'] = $row['initiated_by'];
+            $row['tournamentTitle'] = $row['tournament_title'];
+            $row['teamName'] = $row['team_name'];
+            $row['contactNumber'] = $row['contact_number'];
+            $row['squadSize'] = $row['squad_size'];
+        }
+        return $rows;
     }
+
 }

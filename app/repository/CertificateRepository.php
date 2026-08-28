@@ -48,6 +48,18 @@ class CertificateRepository
         ]);
 
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($row) {
+            $row['certificateId'] = $row['certificate_id'];
+            $row['verificationToken'] = $row['verification_token'];
+            $row['tournamentId'] = $row['tournament_id'];
+            $row['recipientName'] = $row['recipient_name'];
+            $row['playerId'] = $row['player_id'];
+            $row['certificateType'] = $row['certificate_type'];
+            $row['issueDate'] = $row['issue_date'];
+            $row['tournamentTitle'] = $row['tournament_title'];
+            $row['tournamentLocation'] = $row['tournament_location'];
+            $row['organizerName'] = $row['organizer_name'];
+        }
         return $row ?: null;
     }
 
@@ -63,6 +75,18 @@ class CertificateRepository
         $stmt = $this->db->prepare($query);
         $stmt->execute([':tournament_id' => $tournamentId]);
 
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($rows as &$row) {
+            $row['certificateId'] = $row['certificate_id'];
+            $row['verificationToken'] = $row['verification_token'];
+            $row['tournamentId'] = $row['tournament_id'];
+            $row['recipientName'] = $row['recipient_name'];
+            $row['playerId'] = $row['player_id'];
+            $row['certificateType'] = $row['certificate_type'];
+            $row['issueDate'] = $row['issue_date'];
+            $row['tournamentTitle'] = $row['tournament_title'];
+        }
+        return $rows;
     }
+
 }

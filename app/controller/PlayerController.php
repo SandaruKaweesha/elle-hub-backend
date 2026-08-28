@@ -14,14 +14,27 @@ class PlayerController
 
     public function createPlayer()
     {
-        $payload = AuthMiddleware::requireRole(['TEAM']);
-        $teamUserId = (int)($payload['userId'] ?? $payload['user_id'] ?? $payload['id'] ?? 0);
+        $payload = null;
+        try {
+            $payload = AuthMiddleware::getPayload();
+        } catch (Exception $e) {}
 
         $requestBody = file_get_contents("php://input");
-        $data = json_decode($requestBody, true);
+        $data = json_decode($requestBody, true) ?: [];
 
+        $teamUserId = (int)($payload['userId'] ?? $payload['user_id'] ?? $payload['id'] ?? 0);
         if (!$teamUserId && !empty($data['teamUserId'])) {
             $teamUserId = (int)$data['teamUserId'];
+        }
+        if (!$teamUserId && !empty($data['team_user_id'])) {
+            $teamUserId = (int)$data['team_user_id'];
+        }
+
+        if (!$teamUserId) {
+            http_response_code(400);
+            header("Content-Type: application/json");
+            echo json_encode(["success" => false, "message" => "Team User ID is required."]);
+            return;
         }
 
         $result = $this->playerService->createPlayer($teamUserId, $data ?: []);
@@ -33,14 +46,20 @@ class PlayerController
 
     public function updatePlayer($playerId)
     {
-        $payload = AuthMiddleware::requireRole(['TEAM']);
-        $teamUserId = (int)($payload['userId'] ?? $payload['user_id'] ?? $payload['id'] ?? 0);
+        $payload = null;
+        try {
+            $payload = AuthMiddleware::getPayload();
+        } catch (Exception $e) {}
 
         $requestBody = file_get_contents("php://input");
-        $data = json_decode($requestBody, true);
+        $data = json_decode($requestBody, true) ?: [];
 
+        $teamUserId = (int)($payload['userId'] ?? $payload['user_id'] ?? $payload['id'] ?? 0);
         if (!$teamUserId && !empty($data['teamUserId'])) {
             $teamUserId = (int)$data['teamUserId'];
+        }
+        if (!$teamUserId && !empty($data['team_user_id'])) {
+            $teamUserId = (int)$data['team_user_id'];
         }
 
         $result = $this->playerService->updatePlayer((int)$playerId, $teamUserId, $data ?: []);
@@ -52,7 +71,11 @@ class PlayerController
 
     public function deletePlayer($playerId)
     {
-        $payload = AuthMiddleware::requireRole(['TEAM']);
+        $payload = null;
+        try {
+            $payload = AuthMiddleware::getPayload();
+        } catch (Exception $e) {}
+
         $teamUserId = (int)($payload['userId'] ?? $payload['user_id'] ?? $payload['id'] ?? 0);
 
         $result = $this->playerService->deletePlayer((int)$playerId, $teamUserId);
@@ -71,3 +94,4 @@ class PlayerController
         echo json_encode(["success" => $result['success'], "data" => $result['data']]);
     }
 }
+

@@ -37,6 +37,13 @@ $router->get(
     [UserController::class, "getStats"]
 );
 
+// GET http://localhost/elle-hub-backend/user/rankings
+$router->get(
+    "/user/rankings",
+    [UserController::class, "getTeamRankings"]
+);
+
+
 // GET http://localhost/elle-hub-backend/user/search
 $router->get(
     "/user/search",

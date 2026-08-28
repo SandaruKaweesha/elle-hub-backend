@@ -34,6 +34,7 @@ class UserRepository{
 
         return (int) $this->connection->lastInsertId();
     }
+
 //    Check the Email is exsiting
     public function findByEmail(string $email): ?User
     {
@@ -90,20 +91,33 @@ class UserRepository{
             $role = $row['role'];
             if ($role === 'ADMIN' && !empty($row['admin_name'])) {
                 $row['display_name'] = $row['admin_name'];
+                $row['fullName'] = $row['admin_name'];
             } elseif ($role === 'TEAM' && !empty($row['team_name'])) {
                 $row['display_name'] = $row['team_name'];
+                $row['teamName'] = $row['team_name'];
             } elseif ($role === 'ORGANIZER' && !empty($row['organization_name'])) {
                 $row['display_name'] = $row['organization_name'];
+                $row['organizationName'] = $row['organization_name'];
             } elseif ($role === 'SPONSOR' && !empty($row['company_name'])) {
                 $row['display_name'] = $row['company_name'];
+                $row['companyName'] = $row['company_name'];
+                $row['contactPerson'] = $row['sponsor_contact_person'] ?? '';
             } elseif ($role === 'PLAYGROUND' && !empty($row['playground_name'])) {
                 $row['display_name'] = $row['playground_name'];
+                $row['playgroundName'] = $row['playground_name'];
+                $row['locatedDistrict'] = $row['located_district'] ?? '';
             } elseif ($role === 'REFEREE' && !empty($row['referee_name'])) {
                 $row['display_name'] = $row['referee_name'];
+                $row['fullName'] = $row['referee_name'];
+                $row['experienceYears'] = $row['experience_years'] ?? 0;
+                $row['availabilityStatus'] = $row['referee_availability_status'] ?? 'AVAILABLE';
             } else {
                 $parts = explode('@', $row['email']);
                 $row['display_name'] = ucfirst($parts[0]);
             }
+            $row['userId'] = $row['user_id'];
+            $row['contactNumber'] = $row['contact_number'] ?? '';
+            $row['profilePicture'] = $row['profile_picture'] ?? '';
         }
 
         return $rows;
@@ -128,6 +142,9 @@ class UserRepository{
         if (!$user) {
             return null;
         }
+
+        $user['userId'] = $user['user_id'];
+        if (isset($user['profile_picture'])) $user['profilePicture'] = $user['profile_picture'];
 
         // Fetch role specific data
         $role = $user['role'] ?? null;
@@ -155,6 +172,11 @@ class UserRepository{
                     if (isset($roleData['company_name'])) $user['companyName'] = $roleData['company_name'];
                     if (isset($roleData['team_name'])) $user['teamName'] = $roleData['team_name'];
                     if (isset($roleData['playground_name'])) $user['playgroundName'] = $roleData['playground_name'];
+                    if (isset($roleData['contact_number'])) $user['contactNumber'] = $roleData['contact_number'];
+                    if (isset($roleData['contact_person'])) $user['contactPerson'] = $roleData['contact_person'];
+                    if (isset($roleData['experience_years'])) $user['experienceYears'] = $roleData['experience_years'];
+                    if (isset($roleData['located_district'])) $user['locatedDistrict'] = $roleData['located_district'];
+                    if (isset($roleData['availability_status'])) $user['availabilityStatus'] = $roleData['availability_status'];
                 }
                 if (isset($user['profile_picture'])) {
                     $user['profilePicture'] = $user['profile_picture'];
@@ -173,6 +195,7 @@ class UserRepository{
 
         return $user;
     }
+
 
 //    Delete the user
     public function deleteById(int $userId): bool
@@ -223,14 +246,22 @@ class UserRepository{
     public function updateProfile(int $userId, string $role, array $data): bool
     {
         try {
+            if (!empty($data['profilePicture']) || !empty($data['profile_picture'])) {
+                $pic = $data['profilePicture'] ?? $data['profile_picture'];
+                $stmtPic = $this->connection->prepare("UPDATE users SET profile_picture = :pic WHERE user_id = :uid");
+                $stmtPic->bindValue(':pic', $pic);
+                $stmtPic->bindValue(':uid', $userId, PDO::PARAM_INT);
+                $stmtPic->execute();
+            }
+
             $role = strtoupper($role);
             if ($role === 'TEAM') {
                 $sql = "UPDATE teams 
-                        SET team_name = :team_name, 
-                            address = :address, 
-                            district = :district,
-                            contact_number = :contact_number,
-                            description = :description
+                        SET team_name = COALESCE(:team_name, team_name), 
+                            address = COALESCE(:address, address), 
+                            district = COALESCE(:district, district),
+                            contact_number = COALESCE(:contact_number, contact_number),
+                            description = COALESCE(:description, description)
                         WHERE user_id = :user_id";
                 $statement = $this->connection->prepare($sql);
                 $statement->bindValue(':team_name', $data['teamName'] ?? $data['team_name'] ?? null);
@@ -243,9 +274,9 @@ class UserRepository{
                 return true;
             } elseif ($role === 'ORGANIZER') {
                 $sql = "UPDATE organizers 
-                        SET organization_name = :organization_name, 
-                            address = :address, 
-                            contact_number = :contact_number
+                        SET organization_name = COALESCE(:organization_name, organization_name), 
+                            address = COALESCE(:address, address), 
+                            contact_number = COALESCE(:contact_number, contact_number)
                         WHERE user_id = :user_id";
                 $statement = $this->connection->prepare($sql);
                 $statement->bindValue(':organization_name', $data['organizationName'] ?? $data['organization_name'] ?? null);
@@ -256,10 +287,10 @@ class UserRepository{
                 return true;
             } elseif ($role === 'SPONSOR') {
                 $sql = "UPDATE sponsors 
-                        SET company_name = :company_name, 
-                            contact_person = :contact_person,
-                            address = :address, 
-                            contact_number = :contact_number
+                        SET company_name = COALESCE(:company_name, company_name), 
+                            contact_person = COALESCE(:contact_person, contact_person),
+                            address = COALESCE(:address, address), 
+                            contact_number = COALESCE(:contact_number, contact_number)
                         WHERE user_id = :user_id";
                 $statement = $this->connection->prepare($sql);
                 $statement->bindValue(':company_name', $data['companyName'] ?? $data['company_name'] ?? null);
@@ -271,27 +302,27 @@ class UserRepository{
                 return true;
             } elseif ($role === 'REFEREE') {
                 $sql = "UPDATE referees 
-                        SET full_name = :full_name, 
-                            experience_years = :experience_years, 
-                            contact_number = :contact_number,
-                            availability_status = :availability_status
+                        SET full_name = COALESCE(:full_name, full_name), 
+                            experience_years = COALESCE(:experience_years, experience_years), 
+                            contact_number = COALESCE(:contact_number, contact_number),
+                            availability_status = COALESCE(:availability_status, availability_status)
                         WHERE user_id = :user_id";
                 $statement = $this->connection->prepare($sql);
                 $statement->bindValue(':full_name', $data['fullName'] ?? $data['full_name'] ?? null);
                 $statement->bindValue(':experience_years', $data['experienceYears'] ?? $data['experience_years'] ?? null);
                 $statement->bindValue(':contact_number', $data['contactNumber'] ?? $data['contact_number'] ?? null);
-                $statement->bindValue(':availability_status', $data['availabilityStatus'] ?? $data['availability_status'] ?? 'AVAILABLE');
+                $statement->bindValue(':availability_status', $data['availabilityStatus'] ?? $data['availability_status'] ?? null);
                 $statement->bindValue(':user_id', $userId, PDO::PARAM_INT);
                 $statement->execute();
                 return true;
             } elseif ($role === 'PLAYGROUND') {
                 $sql = "UPDATE playgrounds 
-                        SET playground_name = :playground_name, 
-                            located_district = :located_district,
-                            location = :location,
-                            address = :address, 
-                            contact_number = :contact_number,
-                            area = :area
+                        SET playground_name = COALESCE(:playground_name, playground_name), 
+                            located_district = COALESCE(:located_district, located_district),
+                            location = COALESCE(:location, location),
+                            address = COALESCE(:address, address), 
+                            contact_number = COALESCE(:contact_number, contact_number),
+                            area = COALESCE(:area, area)
                         WHERE user_id = :user_id";
                 $statement = $this->connection->prepare($sql);
                 $statement->bindValue(':playground_name', $data['playgroundName'] ?? $data['playground_name'] ?? null);
@@ -304,14 +335,15 @@ class UserRepository{
                 $statement->execute();
                 return true;
             } elseif ($role === 'ADMIN') {
-                $sql = "UPDATE admins SET full_name = :full_name WHERE user_id = :user_id";
+                $sql = "UPDATE admins SET full_name = COALESCE(:full_name, full_name) WHERE user_id = :user_id";
                 $statement = $this->connection->prepare($sql);
                 $statement->bindValue(':full_name', $data['fullName'] ?? $data['full_name'] ?? null);
                 $statement->bindValue(':user_id', $userId, PDO::PARAM_INT);
                 $statement->execute();
                 return true;
             }
-            return false;
+            return true;
+
         } catch (Exception $e) {
             error_log("Error in updateProfile: " . $e->getMessage());
             return false;
