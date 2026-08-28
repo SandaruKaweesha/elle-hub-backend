@@ -37,6 +37,13 @@ $router->get(
     [UserController::class, "getStats"]
 );
 
+// GET http://localhost/elle-hub-backend/user/rankings
+$router->get(
+    "/user/rankings",
+    [UserController::class, "getTeamRankings"]
+);
+
+
 // GET http://localhost/elle-hub-backend/user/search
 $router->get(
     "/user/search",
@@ -73,10 +80,32 @@ $router->delete(
     [UserController::class, "deleteUser"]
 );
 
-// POST http://localhost/elle-hub-backend/user/approve/5
+// POST & PUT http://localhost/elle-hub-backend/user/approve/5
 $router->post(
     "/user/approve/{id}",
     [UserController::class, "approveUser"]
+);
+
+$router->put(
+    "/user/approve/{id}",
+    [UserController::class, "approveUser"]
+);
+
+// POST & PUT http://localhost/elle-hub-backend/user/reject/5
+$router->post(
+    "/user/reject/{id}",
+    [UserController::class, "rejectUser"]
+);
+
+$router->put(
+    "/user/reject/{id}",
+    [UserController::class, "rejectUser"]
+);
+
+// PUT http://localhost/elle-hub-backend/user/updateStatus/5
+$router->put(
+    "/user/updateStatus/{id}",
+    [UserController::class, "updateStatus"]
 );
 
 // POST http://localhost/elle-hub-backend/user/request-deletion

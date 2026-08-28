@@ -199,20 +199,40 @@ class TournamentService{
             ];
         }
 
-        // Trigger #6: Broadcast notification to ALL USERS on Tournament Approval
-        if (strtoupper($approvalStatus) === 'APPROVED') {
-            try {
-                require_once __DIR__ . "/NotificationService.php";
-                $notifService = new NotificationService();
-                $title = $tournament['title'] ?? 'Elle Championship';
-                $location = $tournament['location'] ?? 'Central Grounds';
+        // Trigger: Send notification to Organizer and broadcast to All Users on Tournament Approval/Rejection
+        try {
+            require_once __DIR__ . "/NotificationService.php";
+            $notifService = new NotificationService();
+            $title = $tournament['title'] ?? 'Elle Championship';
+            $location = $tournament['location'] ?? 'Central Grounds';
+            $organizerUserId = (int) ($tournament['organizer_id'] ?? $tournament['organizer_user_id'] ?? $tournament['user_id'] ?? 0);
+
+            if (strtoupper($approvalStatus) === 'APPROVED') {
+                if ($organizerUserId > 0) {
+                    $notifService->sendToUser(
+                        $organizerUserId,
+                        'Tournament Approved! 🏆',
+                        "Your tournament '{$title}' has been officially approved by Admin and is now live for registrations.",
+                        'TOURNAMENT'
+                    );
+                }
+
                 $notifService->sendToAll(
                     "New Championship Announced! 🏆",
                     "The '{$title}' tournament at {$location} has been officially approved and is now open for registration!",
                     "TOURNAMENT"
                 );
-            } catch (Exception $e) {}
-        }
+            } elseif (strtoupper($approvalStatus) === 'REJECTED') {
+                if ($organizerUserId > 0) {
+                    $notifService->sendToUser(
+                        $organizerUserId,
+                        'Tournament Review Status Update',
+                        "Your tournament '{$title}' submission review status was set to Rejected by Admin.",
+                        'TOURNAMENT'
+                    );
+                }
+            }
+        } catch (Exception $e) {}
 
         return [
             "success" => true,
@@ -801,16 +821,32 @@ class TournamentService{
         try {
             $conn = Database::getConnection();
 
-            // Check tournament approval status by Admin
-            $stmtApp = $conn->prepare("SELECT approval_status FROM tournaments WHERE tournament_id = ?");
+            // 0. Check tournament approval status by Admin
+            $stmtApp = $conn->prepare("SELECT approval_status, tournament_held_date, start_date FROM tournaments WHERE tournament_id = ?");
             $stmtApp->execute([$tournamentId]);
-            $appStatus = $stmtApp->fetchColumn();
+            $tRow = $stmtApp->fetch(PDO::FETCH_ASSOC);
 
-            if (strtoupper((string)$appStatus) !== 'APPROVED') {
+            if (strtoupper((string)($tRow['approval_status'] ?? '')) !== 'APPROVED') {
                 return [
                     "success" => false,
                     "message" => "Tournament is pending admin approval. Requests and invitations cannot be processed until the tournament is approved by an admin."
                 ];
+            }
+
+            // 0b. Check if referee is UNAVAILABLE on the tournament date
+            $tDate = !empty($tRow['tournament_held_date']) ? $tRow['tournament_held_date'] : (!empty($tRow['start_date']) ? $tRow['start_date'] : null);
+            if ($tDate) {
+                $stmtAvail = $conn->prepare("
+                    SELECT status FROM referee_availability 
+                    WHERE referee_user_id = ? AND available_date = ? AND status = 'UNAVAILABLE'
+                ");
+                $stmtAvail->execute([$refereeUserId, $tDate]);
+                if ($stmtAvail->fetch()) {
+                    return [
+                        "success" => false,
+                        "message" => "Cannot send invitation: This referee has set themselves as UNAVAILABLE on the tournament date ({$tDate})."
+                    ];
+                }
             }
 
             // Check if referee user account is approved by Admin
@@ -902,16 +938,28 @@ class TournamentService{
             $sql = "SELECT r.request_id, r.tournament_id, r.referee_user_id, r.request_date, r.status,
                            COALESCE(r.initiated_by, 'REFEREE') AS initiated_by,
                            t.title AS tournament_title, t.location, t.start_date, t.end_date, t.tournament_held_date,
+                           t.is_finalized, t.is_draw_finalized,
+                           COALESCE(p.playground_name, NULL) AS playground_name,
+                           COALESCE(p.address, p.location, NULL) AS playground_address,
                            COALESCE(o.organization_name, 'Elle Sports Association') AS organizer_name,
                            COALESCE(o.contact_number, 'Available on Request') AS contact_number
                     FROM tournament_referee_requests r
                     JOIN tournaments t ON r.tournament_id = t.tournament_id
                     LEFT JOIN organizers o ON t.organizer_id = o.user_id
+                    LEFT JOIN tournament_playground_requests pr ON (t.tournament_id = pr.tournament_id AND pr.status IN ('ACCEPTED', 'APPROVED'))
+                    LEFT JOIN playgrounds p ON pr.playground_user_id = p.user_id
                     WHERE r.referee_user_id = ?
                     ORDER BY r.request_date DESC";
             $stmt = Database::getConnection()->prepare($sql);
             $stmt->execute([$refereeUserId]);
-            return ["success" => true, "data" => $stmt->fetchAll(PDO::FETCH_ASSOC)];
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($rows as &$row) {
+                $row['is_finalized'] = (int)($row['is_finalized'] ?? 0);
+                $row['is_draw_finalized'] = (int)($row['is_draw_finalized'] ?? 0);
+                $row['isFinalized'] = $row['is_finalized'] === 1;
+                $row['isDrawFinalized'] = $row['is_draw_finalized'] === 1;
+            }
+            return ["success" => true, "data" => $rows];
         } catch (Exception $e) {
             return ["success" => false, "message" => $e->getMessage()];
         }

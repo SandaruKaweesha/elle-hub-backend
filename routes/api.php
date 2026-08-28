@@ -10,12 +10,8 @@ require_once __DIR__ . "/tournamentRoutes.php";
 require_once __DIR__ . "/playerRoutes.php";
 require_once __DIR__ . "/certificateRoutes.php";
 require_once __DIR__ . "/messageRoutes.php";
+require_once __DIR__ . "/teamRoutes.php";
 
-//require_once __DIR__ . "/refereeRoutes.php";
-//
-//require_once __DIR__ . "/playgroundRoutes.php";
-//
-//require_once __DIR__ . "/teamRoutes.php";
 //
 //require_once __DIR__ . "/sponsorRoutes.php";
 //

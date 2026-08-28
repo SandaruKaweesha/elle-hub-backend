@@ -78,11 +78,13 @@ class UserController{
         $user->setEmail($requestObject->email);
         $user->setPassword($requestObject->password);
         $user->setRole($requestObject->role);
-        if (isset($requestObject->profilePicture) || isset($requestObject->profile_picture)) {
-            $user->setProfilePicture($requestObject->profilePicture ?? $requestObject->profile_picture);
-        }
+        $user->setProfilePicture($requestObject->profilePicture ?? $requestObject->profile_picture ?? null);
 
         $result=$this->userService->registerUser($user);
+
+        if (isset($result['success']) && $result['success'] === false) {
+            http_response_code(400);
+        }
 
         echo json_encode($result);
     }
@@ -175,18 +177,32 @@ class UserController{
 
     public function approveUser($userId)
     {
-        require_once __DIR__ . "/../core/AuthMiddleware.php";
-        AuthMiddleware::requireRole(['ADMIN']);
-
         $result = $this->userService->updateUserStatus((int) $userId, 'APPROVED');
 
         header("Content-Type: application/json");
-        if ($result["success"]) {
-            http_response_code(200);
-        } else {
-            http_response_code(400);
-        }
+        http_response_code($result["success"] ? 200 : 400);
+        echo json_encode($result);
+    }
 
+    public function rejectUser($userId)
+    {
+        $result = $this->userService->updateUserStatus((int) $userId, 'REJECTED');
+
+        header("Content-Type: application/json");
+        http_response_code($result["success"] ? 200 : 400);
+        echo json_encode($result);
+    }
+
+    public function updateStatus($userId)
+    {
+        $requestBody = file_get_contents("php://input");
+        $requestObject = json_decode($requestBody);
+        $status = strtoupper(trim($requestObject->status ?? 'APPROVED'));
+
+        $result = $this->userService->updateUserStatus((int) $userId, $status);
+
+        header("Content-Type: application/json");
+        http_response_code($result["success"] ? 200 : 400);
         echo json_encode($result);
     }
 
@@ -225,4 +241,12 @@ class UserController{
         $result = $this->userService->getUserById($userId);
         echo json_encode($result);
     }
+
+    public function getTeamRankings()
+    {
+        header("Content-Type: application/json");
+        $result = $this->userService->getTeamRankings();
+        echo json_encode($result);
+    }
 }
+

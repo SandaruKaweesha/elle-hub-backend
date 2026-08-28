@@ -139,7 +139,10 @@ class TournamentRepository{
 //  Find By the ID
     public function findById(int $tournamentId): ?array
     {
-        $sql = "SELECT * FROM tournaments WHERE tournament_id = :tournament_id";
+        $sql = "SELECT t.*, o.organization_name, o.contact_number AS organizer_contact, o.address AS organizer_address 
+                FROM tournaments t 
+                LEFT JOIN organizers o ON t.organizer_id = o.user_id 
+                WHERE t.tournament_id = :tournament_id";
 
         $statement = $this->connection->prepare($sql);
 
@@ -157,8 +160,21 @@ class TournamentRepository{
             return null;
         }
 
+        // Map camelCase & snake_case dual keys for frontend compatibility
+        $tournament['tournamentId'] = $tournament['tournament_id'];
+        $tournament['organizerId'] = $tournament['organizer_id'];
+        $tournament['organizationName'] = $tournament['organization_name'] ?? 'Elle Sports Organizer';
+        $tournament['organizerName'] = $tournament['organization_name'] ?? 'Elle Sports Organizer';
+        $tournament['startDate'] = $tournament['start_date'];
+        $tournament['endDate'] = $tournament['end_date'];
+        $tournament['tournamentHeldDate'] = $tournament['tournament_held_date'];
+        $tournament['maximumTeamLimit'] = $tournament['maximum_team_limit'];
+        $tournament['maximumRefereeLimit'] = $tournament['maximum_referee_limit'];
+        $tournament['prizeDetails'] = $tournament['prize_details'];
+
         return $tournament;
     }
+
 
 
 //    Update the Status
@@ -275,44 +291,49 @@ class TournamentRepository{
         );
 
         $statement->bindValue(
+            ":title",
+            $request->title ?? ''
+        );
+
+        $statement->bindValue(
             ":description",
-            $request->description
+            $request->description ?? ''
         );
 
         $statement->bindValue(
             ":location",
-            $request->location
+            $request->location ?? ''
         );
 
         $statement->bindValue(
             ":start_date",
-            $request->startDate
+            $request->startDate ?? $request->start_date ?? null
         );
 
         $statement->bindValue(
             ":end_date",
-            $request->endDate
+            $request->endDate ?? $request->end_date ?? null
         );
 
         $statement->bindValue(
             ":tournament_held_date",
-            $request->tournamentHeldDate ?? null
+            $request->tournamentHeldDate ?? $request->tournament_held_date ?? null
         );
 
         $statement->bindValue(
             ":maximum_team_limit",
-            $request->maximumTeamLimit,
+            (int)($request->maximumTeamLimit ?? $request->maximum_team_limit ?? 16),
             PDO::PARAM_INT
         );
 
         $statement->bindValue(
             ":rules",
-            $request->rules
+            $request->rules ?? ''
         );
 
         $statement->bindValue(
             ":prize_details",
-            $request->prizeDetails
+            $request->prizeDetails ?? $request->prize_details ?? ''
         );
 
         $statement->bindValue(
@@ -321,10 +342,11 @@ class TournamentRepository{
             PDO::PARAM_INT
         );
 
-        $statement->execute();
+        $executed = $statement->execute();
 
-        return $statement->rowCount() > 0;
+        return $executed;
     }
+
 
 //    Find tournaments by organizer ID, ordered by creation date descending
     public function findByOrganizerId(int $organizerId): array

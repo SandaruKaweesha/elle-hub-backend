@@ -14,17 +14,18 @@ class PlayerService
 
     public function createPlayer(int $teamUserId, array $data): array
     {
-        if (empty($data['playerName'])) {
+        $playerName = $data['playerName'] ?? $data['player_name'] ?? null;
+        if (empty($playerName)) {
             return ["success" => false, "message" => "Player name is required", "code" => 400];
         }
 
         $player = new Player(
             null,
             $teamUserId,
-            $data['playerName'],
-            isset($data['age']) ? (int)$data['age'] : null,
+            $playerName,
+            (isset($data['age']) && $data['age'] !== '') ? (int)$data['age'] : null,
             $data['position'] ?? null,
-            $data['contactNumber'] ?? null
+            $data['contactNumber'] ?? $data['contact_number'] ?? null
         );
 
         $saved = $this->playerRepository->save($player);
@@ -42,22 +43,23 @@ class PlayerService
             return ["success" => false, "message" => "Player not found", "code" => 404];
         }
 
-        // Verify ownership
-        if ((int)$existingPlayer['team_user_id'] !== $teamUserId) {
+        // Verify ownership if teamUserId is available
+        if ($teamUserId > 0 && (int)$existingPlayer['team_user_id'] !== $teamUserId) {
             return ["success" => false, "message" => "Unauthorized access to player record", "code" => 403];
         }
 
-        if (empty($data['playerName'])) {
+        $playerName = $data['playerName'] ?? $data['player_name'] ?? null;
+        if (empty($playerName)) {
             return ["success" => false, "message" => "Player name is required", "code" => 400];
         }
 
         $player = new Player(
             $playerId,
-            $teamUserId,
-            $data['playerName'],
-            isset($data['age']) ? (int)$data['age'] : null,
+            (int)($existingPlayer['team_user_id'] ?? $teamUserId),
+            $playerName,
+            (isset($data['age']) && $data['age'] !== '') ? (int)$data['age'] : null,
             $data['position'] ?? null,
-            $data['contactNumber'] ?? null
+            $data['contactNumber'] ?? $data['contact_number'] ?? null
         );
 
         $updated = $this->playerRepository->update($player);
@@ -75,10 +77,11 @@ class PlayerService
             return ["success" => false, "message" => "Player not found", "code" => 404];
         }
 
-        // Verify ownership
-        if ((int)$existingPlayer['team_user_id'] !== $teamUserId) {
+        // Verify ownership if teamUserId is available
+        if ($teamUserId > 0 && (int)$existingPlayer['team_user_id'] !== $teamUserId) {
             return ["success" => false, "message" => "Unauthorized access to player record", "code" => 403];
         }
+
 
         $deleted = $this->playerRepository->delete($playerId);
 

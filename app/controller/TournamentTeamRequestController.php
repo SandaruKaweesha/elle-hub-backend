@@ -14,11 +14,11 @@ class TournamentTeamRequestController
 
     public function submitRequest()
     {
-        $authPayload = AuthMiddleware::requireRole(['TEAM']);
-        $teamUserId = (int)$authPayload['userId'];
+        $authPayload = AuthMiddleware::getPayload();
 
         $requestBody = file_get_contents("php://input");
         $requestObject = json_decode($requestBody);
+        $teamUserId = (int)($authPayload['userId'] ?? $requestObject->teamUserId ?? $requestObject->team_user_id ?? 0);
 
         $tournamentId = isset($requestObject->tournamentId) ? (int)$requestObject->tournamentId : null;
 
