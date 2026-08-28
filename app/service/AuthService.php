@@ -31,6 +31,23 @@ class AuthService
         }
 
         $role = $user->getRole();
+        $userStatus = strtoupper(trim($user->getStatus() ?? 'APPROVED'));
+
+        // Non-admin user accounts must be APPROVED by Admin before logging in
+        if ($role !== 'ADMIN' && $userStatus === 'PENDING') {
+            return [
+                "success" => false,
+                "message" => "Your account is pending approval by the Admin. Please wait for administrator approval before logging in."
+            ];
+        }
+
+        if ($role !== 'ADMIN' && $userStatus === 'REJECTED') {
+            return [
+                "success" => false,
+                "message" => "Your account registration has been rejected by the administrator."
+            ];
+        }
+
         if (empty($role)) {
             $emailLower = strtolower($user->getEmail());
             if (str_contains($emailLower, 'admin')) {

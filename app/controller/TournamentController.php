@@ -18,7 +18,7 @@ class TournamentController{
 
         $tournament = new Tournament();
 
-        $tournament->setOrganizerId($requestObject->organizerId ?? null);
+        $tournament->setOrganizerId($requestObject->organizerId ?? $requestObject->organizerUserId ?? $requestObject->organizer_id ?? null);
         $tournament->setTitle($requestObject->title ?? null);
         $tournament->setDescription($requestObject->description ?? null);
         $tournament->setLocation($requestObject->location ?? null);

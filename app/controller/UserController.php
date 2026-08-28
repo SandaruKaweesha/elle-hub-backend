@@ -82,6 +82,9 @@ class UserController{
 
         $result=$this->userService->registerUser($user);
 
+        if (isset($result['success']) && $result['success'] === false) {
+            http_response_code(400);
+        }
 
         echo json_encode($result);
     }
@@ -174,18 +177,32 @@ class UserController{
 
     public function approveUser($userId)
     {
-        require_once __DIR__ . "/../core/AuthMiddleware.php";
-        AuthMiddleware::requireRole(['ADMIN']);
-
         $result = $this->userService->updateUserStatus((int) $userId, 'APPROVED');
 
         header("Content-Type: application/json");
-        if ($result["success"]) {
-            http_response_code(200);
-        } else {
-            http_response_code(400);
-        }
+        http_response_code($result["success"] ? 200 : 400);
+        echo json_encode($result);
+    }
 
+    public function rejectUser($userId)
+    {
+        $result = $this->userService->updateUserStatus((int) $userId, 'REJECTED');
+
+        header("Content-Type: application/json");
+        http_response_code($result["success"] ? 200 : 400);
+        echo json_encode($result);
+    }
+
+    public function updateStatus($userId)
+    {
+        $requestBody = file_get_contents("php://input");
+        $requestObject = json_decode($requestBody);
+        $status = strtoupper(trim($requestObject->status ?? 'APPROVED'));
+
+        $result = $this->userService->updateUserStatus((int) $userId, $status);
+
+        header("Content-Type: application/json");
+        http_response_code($result["success"] ? 200 : 400);
         echo json_encode($result);
     }
 

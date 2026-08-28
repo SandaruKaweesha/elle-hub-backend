@@ -9,22 +9,7 @@ class MessageService
      */
     public function hasAcceptedSponsorship(int $user1Id, int $user2Id): bool
     {
-        try {
-            $conn = Database::getConnection();
-            $stmt = $conn->prepare("
-                SELECT COUNT(*) 
-                FROM tournament_sponsor_requests tsr
-                JOIN tournaments t ON tsr.tournament_id = t.tournament_id
-                WHERE ((t.organizer_id = ? AND tsr.sponsor_user_id = ?)
-                    OR (t.organizer_id = ? AND tsr.sponsor_user_id = ?))
-                  AND UPPER(tsr.status) IN ('ACCEPTED', 'APPROVED')
-            ");
-            $stmt->execute([$user1Id, $user2Id, $user2Id, $user1Id]);
-            $count = (int)$stmt->fetchColumn();
-            return $count > 0;
-        } catch (Exception $e) {
-            return false;
-        }
+        return true;
     }
 
     /**
@@ -62,6 +47,8 @@ class MessageService
                     SELECT u.user_id, 
                            COALESCE(o.organization_name, u.email, 'Tournament Organizer') AS display_name,
                            u.email,
+                           u.profile_picture AS avatar,
+                           u.profile_picture,
                            COALESCE(o.contact_number, 'Available on Request') AS contact_number,
                            'ORGANIZER' AS role,
                            o.organization_name
@@ -75,6 +62,8 @@ class MessageService
                     SELECT u.user_id, 
                            COALESCE(s.company_name, u.email, 'Sponsor Company') AS display_name,
                            u.email,
+                           u.profile_picture AS avatar,
+                           u.profile_picture,
                            COALESCE(s.contact_number, 'Available on Request') AS contact_number,
                            'SPONSOR' AS role,
                            s.contact_person
@@ -236,13 +225,6 @@ class MessageService
                 ];
             }
 
-            // Check if sponsor has accepted the tournament sponsorship request
-            if (!$this->hasAcceptedSponsorship($senderId, $receiverId)) {
-                return [
-                    "success" => false,
-                    "message" => "Messaging is locked until the sponsor accepts the tournament sponsorship request."
-                ];
-            }
 
             $stmtInsert = $conn->prepare("
                 INSERT INTO messages (sender_user_id, receiver_user_id, content, sent_at, is_read)

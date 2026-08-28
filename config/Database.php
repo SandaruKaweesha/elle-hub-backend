@@ -13,7 +13,7 @@ class Database
             $port = "3306";
             $database = "ellehubnew"; // Change if your local DB has a different name
             $username = "root";
-            $password = "";
+            $password = "1234";
 
             $dsn = "mysql:host=$host;port=$port;dbname=$database;charset=utf8mb4";
 
@@ -25,7 +25,6 @@ class Database
             ];
 
             try {
-
                 self::$connection = new PDO(
                     $dsn,
                     $username,

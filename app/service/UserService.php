@@ -33,11 +33,23 @@ class UserService{
         if ($this->userRepository->existsByEmail($user->getEmail())) {
             return [
                 "success" => false,
-                "message" => "Email already exists."
+                "message" => "Email already registered. Please use a different email address."
             ];
         }
 
-        // Set default values
+        // Check whether contact number already exists
+        $contactNumber = null;
+        if (method_exists($user, 'getContactNumber')) {
+            $contactNumber = $user->getContactNumber();
+        }
+        if (!empty($contactNumber) && $this->userRepository->existsByContactNumber($contactNumber)) {
+            return [
+                "success" => false,
+                "message" => "Contact number already registered. Please use a different contact number."
+            ];
+        }
+
+        // Set default values (Account requires Admin approval)
         $user->setStatus("PENDING");
 
         // Hash the password
@@ -240,20 +252,28 @@ class UserService{
 
         $updated = $this->userRepository->updateStatus($userId, $status);
         if ($updated) {
-            // Trigger #2: Send notification to User on Account Approval
-            if (strtoupper($status) === 'APPROVED' || strtoupper($status) === 'ACTIVE') {
-                try {
-                    require_once __DIR__ . "/NotificationService.php";
-                    $notifService = new NotificationService();
-                    $roleName = $user['role'] ?? 'user';
+            // Trigger: Send notification to User on Account Approval / Rejection
+            try {
+                require_once __DIR__ . "/NotificationService.php";
+                $notifService = new NotificationService();
+                $roleName = $user['role'] ?? 'user';
+
+                if (strtoupper($status) === 'APPROVED' || strtoupper($status) === 'ACTIVE') {
                     $notifService->sendToUser(
                         $userId,
                         'Account Approved! 🎉',
                         "Your {$roleName} account has been officially approved by Admin. You now have full access to Elle Hub features.",
                         'ACCOUNT'
                     );
-                } catch (Exception $e) {}
-            }
+                } elseif (strtoupper($status) === 'REJECTED') {
+                    $notifService->sendToUser(
+                        $userId,
+                        'Account Registration Status Update',
+                        "Your {$roleName} account registration was reviewed and not approved by Admin.",
+                        'ACCOUNT'
+                    );
+                }
+            } catch (Exception $e) {}
 
             return [
                 "success" => true,
