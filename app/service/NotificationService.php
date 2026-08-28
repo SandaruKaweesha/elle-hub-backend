@@ -88,6 +88,71 @@ class NotificationService
     }
 
     /**
+     * Send notification to all users participating in a specific tournament 
+     * (Organizer, Accepted Teams, Referees, Playgrounds, Sponsors)
+     */
+    public function sendToTournamentParticipants(int $tournamentId, string $title, string $message, string $type = 'TOURNAMENT'): bool
+    {
+        try {
+            $userIds = [];
+
+            // 1. Organizer
+            $stmtOrg = $this->db->prepare("SELECT organizer_id FROM tournaments WHERE tournament_id = ?");
+            $stmtOrg->execute([$tournamentId]);
+            $orgId = (int)$stmtOrg->fetchColumn();
+            if ($orgId > 0) $userIds[] = $orgId;
+
+            // 2. Teams
+            $stmtTeams = $this->db->prepare("SELECT team_user_id FROM tournament_team_requests WHERE tournament_id = ? AND status IN ('ACCEPTED', 'APPROVED')");
+            $stmtTeams->execute([$tournamentId]);
+            foreach ($stmtTeams->fetchAll(PDO::FETCH_COLUMN) as $u) {
+                if ($u > 0) $userIds[] = (int)$u;
+            }
+
+            // 3. Referees
+            $stmtRef = $this->db->prepare("SELECT referee_user_id FROM tournament_referee_requests WHERE tournament_id = ? AND status IN ('ACCEPTED', 'APPROVED')");
+            $stmtRef->execute([$tournamentId]);
+            foreach ($stmtRef->fetchAll(PDO::FETCH_COLUMN) as $u) {
+                if ($u > 0) $userIds[] = (int)$u;
+            }
+
+            // 4. Playgrounds
+            $stmtPg = $this->db->prepare("SELECT playground_user_id FROM tournament_playground_requests WHERE tournament_id = ? AND status IN ('ACCEPTED', 'APPROVED')");
+            $stmtPg->execute([$tournamentId]);
+            foreach ($stmtPg->fetchAll(PDO::FETCH_COLUMN) as $u) {
+                if ($u > 0) $userIds[] = (int)$u;
+            }
+
+            // 5. Sponsors
+            $stmtSp = $this->db->prepare("SELECT sponsor_user_id FROM tournament_sponsor_requests WHERE tournament_id = ? AND status IN ('ACCEPTED', 'APPROVED')");
+            $stmtSp->execute([$tournamentId]);
+            foreach ($stmtSp->fetchAll(PDO::FETCH_COLUMN) as $u) {
+                if ($u > 0) $userIds[] = (int)$u;
+            }
+
+            $uniqueUserIds = array_unique($userIds);
+            if (empty($uniqueUserIds)) {
+                // Fallback: send to all active users if no participants linked yet
+                return $this->sendToAll($title, $message, $type);
+            }
+
+            $stmtNotif = $this->db->prepare("INSERT INTO notifications (title, message, type, created_at) VALUES (?, ?, ?, NOW())");
+            $stmtNotif->execute([$title, $message, strtoupper($type)]);
+            $notificationId = (int) $this->db->lastInsertId();
+
+            $stmtUserNotif = $this->db->prepare("INSERT INTO user_notifications (user_id, notification_id, is_read, received_at) VALUES (?, ?, 0, NOW())");
+            foreach ($uniqueUserIds as $uId) {
+                $stmtUserNotif->execute([$uId, $notificationId]);
+            }
+
+            return true;
+        } catch (Exception $e) {
+            error_log("Error in sendToTournamentParticipants: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
      * Get all notifications for a given user with unread count
      */
     public function getUserNotifications(int $userId): array

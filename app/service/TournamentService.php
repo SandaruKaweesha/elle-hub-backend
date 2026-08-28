@@ -511,6 +511,26 @@ class TournamentService{
 
 
 
+            // Check if playground venue is UNAVAILABLE on the tournament date
+            $stmtT = $conn->prepare("SELECT tournament_held_date, start_date FROM tournaments WHERE tournament_id = ?");
+            $stmtT->execute([$tournamentId]);
+            $tRow = $stmtT->fetch(PDO::FETCH_ASSOC);
+            $tDate = !empty($tRow['tournament_held_date']) ? $tRow['tournament_held_date'] : (!empty($tRow['start_date']) ? $tRow['start_date'] : null);
+
+            if ($tDate) {
+                $stmtAvail = $conn->prepare("
+                    SELECT status FROM playground_availability 
+                    WHERE playground_user_id = ? AND available_date = ? AND status = 'UNAVAILABLE'
+                ");
+                $stmtAvail->execute([$playgroundUserId, $tDate]);
+                if ($stmtAvail->fetch()) {
+                    return [
+                        "success" => false,
+                        "message" => "Cannot send booking request: This playground venue is marked UNAVAILABLE on the tournament date ({$tDate})."
+                    ];
+                }
+            }
+
             // Check if already requested
             $stmt = $conn->prepare("SELECT status FROM tournament_playground_requests WHERE tournament_id = ? AND playground_user_id = ?");
             $stmt->execute([$tournamentId, $playgroundUserId]);
@@ -573,6 +593,7 @@ class TournamentService{
             $stmt = $conn->prepare("
                 SELECT tpr.request_id, tpr.tournament_id, tpr.playground_user_id, tpr.request_date, tpr.status, tpr.initiated_by,
                        t.status AS tournament_status, t.title AS tournament_title, t.location, t.start_date, t.end_date, t.tournament_held_date,
+                       t.is_finalized, t.is_draw_finalized,
                        COALESCE(o.organization_name, 'Elle Sports Association') AS organizer_name,
                        COALESCE(o.contact_number, 'Available on Request') AS contact_number
                 FROM tournament_playground_requests tpr
@@ -583,6 +604,19 @@ class TournamentService{
             ");
             $stmt->execute([$playgroundUserId]);
             $requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($requests as &$r) {
+                $r['is_finalized'] = (int)($r['is_finalized'] ?? 0);
+                $r['is_draw_finalized'] = (int)($r['is_draw_finalized'] ?? 0);
+                $r['isFinalized'] = $r['is_finalized'] === 1;
+                $r['isDrawFinalized'] = $r['is_draw_finalized'] === 1;
+
+                // If tournament is finalized by organizer, auto-confirm pending playground booking
+                if (($r['is_finalized'] === 1 || $r['is_draw_finalized'] === 1) && strtoupper((string)$r['status']) === 'PENDING') {
+                    $r['status'] = 'ACCEPTED';
+                    $conn->prepare("UPDATE tournament_playground_requests SET status = 'ACCEPTED' WHERE request_id = ?")->execute([$r['request_id']]);
+                }
+            }
 
             return ["success" => true, "data" => $requests];
         } catch (Exception $e) {
@@ -1260,28 +1294,28 @@ class TournamentService{
         try {
             $conn = Database::getConnection();
             
-            $sql = "SELECT COUNT(DISTINCT r.tournament_id) AS completed_count
+            $sql = "SELECT COUNT(DISTINCT r.tournament_id) AS total_count
                     FROM tournament_referee_requests r
                     JOIN tournaments t ON r.tournament_id = t.tournament_id
                     WHERE r.referee_user_id = ?
-                      AND r.status IN ('ACCEPTED', 'APPROVED')
-                      AND UPPER(t.status) = 'COMPLETED'";
+                      AND r.status IN ('ACCEPTED', 'APPROVED')";
             $stmt = $conn->prepare($sql);
             $stmt->execute([$refereeUserId]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
-            $completedCount = (int) ($row['completed_count'] ?? 0);
+            $totalCount = (int) ($row['total_count'] ?? 0);
 
-            $rating = 5.0 + ($completedCount * 0.5);
-            if ($rating > 10.0) {
-                $rating = 10.0;
+            if ($totalCount === 0) {
+                $rating = 0.0;
+            } else {
+                $rating = min(5.0, round(1.0 + ($totalCount * 0.8), 1));
             }
 
             $updateStmt = $conn->prepare("UPDATE referees SET rating = ? WHERE user_id = ?");
             $updateStmt->execute([$rating, $refereeUserId]);
 
-            return $rating;
+            return (float) $rating;
         } catch (Exception $e) {
-            return 5.0;
+            return 0.0;
         }
     }
 
@@ -1540,14 +1574,15 @@ class TournamentService{
                 $stmtMatch->execute([$tournamentId, $matchDate, $matchTime, 'Final Match']);
             }
 
-            // Trigger #7: Send Notification on Tournament Setup Finalization
+            // Trigger #7: Send Notification on Tournament Setup Finalization to all participants
             try {
                 require_once __DIR__ . "/NotificationService.php";
                 $notifService = new NotificationService();
                 $tStmt2 = $db->prepare("SELECT title FROM tournaments WHERE tournament_id = ?");
                 $tStmt2->execute([$tournamentId]);
                 $tTitle = $tStmt2->fetchColumn() ?: "Championship";
-                $notifService->sendToAll(
+                $notifService->sendToTournamentParticipants(
+                    $tournamentId,
                     "Match Schedule Live! ⚡",
                     "Setup and match schedule for tournament '{$tTitle}' is finalized. Check your match fixtures!",
                     "TOURNAMENT"
@@ -1584,7 +1619,7 @@ class TournamentService{
             $db->prepare("UPDATE tournament_sponsor_requests SET status = 'REJECTED' WHERE tournament_id = ? AND status = 'PENDING'")->execute([$tournamentId]);
             $db->prepare("UPDATE tournament_playground_requests SET status = 'REJECTED' WHERE tournament_id = ? AND status = 'PENDING'")->execute([$tournamentId]);
 
-            // Trigger #8: Broadcast Champion Winner Announcement on Tournament Completion
+            // Trigger #8: Broadcast Champion Winner Announcement on Tournament Completion to all participants
             try {
                 require_once __DIR__ . "/NotificationService.php";
                 $notifService = new NotificationService();
@@ -1595,7 +1630,8 @@ class TournamentService{
                 $drawData = !empty($tRow['draw_data']) ? json_decode($tRow['draw_data'], true) : [];
                 $winner = $drawData['winner'] ?? $drawData['bracketWinners']['champion'] ?? 'Winner Team';
 
-                $notifService->sendToAll(
+                $notifService->sendToTournamentParticipants(
+                    $tournamentId,
                     "Championship Winner Announced! 🏆",
                     "The {$title} championship has concluded! Congratulations to {$winner} for winning the tournament!",
                     "TOURNAMENT"
