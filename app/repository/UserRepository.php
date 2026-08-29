@@ -110,6 +110,11 @@ class UserRepository{
                 $row['display_name'] = $row['referee_name'];
                 $row['fullName'] = $row['referee_name'];
                 $row['experienceYears'] = $row['experience_years'] ?? 0;
+                require_once __DIR__ . "/../service/TournamentService.php";
+                $tService = new TournamentService();
+                $calcRating = $tService->recalculateRefereeRating((int)$row['user_id']);
+                $row['referee_rating'] = $calcRating;
+                $row['rating'] = $calcRating;
                 $row['availabilityStatus'] = $row['referee_availability_status'] ?? 'AVAILABLE';
             } else {
                 $parts = explode('@', $row['email']);
@@ -177,6 +182,13 @@ class UserRepository{
                     if (isset($roleData['experience_years'])) $user['experienceYears'] = $roleData['experience_years'];
                     if (isset($roleData['located_district'])) $user['locatedDistrict'] = $roleData['located_district'];
                     if (isset($roleData['availability_status'])) $user['availabilityStatus'] = $roleData['availability_status'];
+                    if ($role === 'REFEREE') {
+                        require_once __DIR__ . "/../service/TournamentService.php";
+                        $tService = new TournamentService();
+                        $calcRating = $tService->recalculateRefereeRating((int)$userId);
+                        $user['referee_rating'] = $calcRating;
+                        $user['rating'] = $calcRating;
+                    }
                 }
                 if (isset($user['profile_picture'])) {
                     $user['profilePicture'] = $user['profile_picture'];

@@ -108,7 +108,9 @@ class MessageService
                 $contact['last_message'] = $lastMsg ? $lastMsg['content'] : ($canMessage ? "No message history yet" : "Sponsorship request pending acceptance");
                 $contact['last_message_time'] = $lastMsg ? $lastMsg['sent_at'] : null;
                 $contact['unread_count'] = (int)($unreadRow['unread_count'] ?? 0);
-                $contact['avatar'] = "https://api.dicebear.com/7.x/avataaars/svg?seed=" . urlencode($contact['display_name']) . "&backgroundColor=eaf1ec";
+                $contact['avatar'] = !empty($contact['profile_picture']) 
+                    ? $contact['profile_picture'] 
+                    : "https://api.dicebear.com/7.x/avataaars/svg?seed=" . urlencode($contact['display_name']) . "&backgroundColor=eaf1ec";
             }
 
             // Sort contacts so latest active chats with most recent messages come FIRST (Top of list)
