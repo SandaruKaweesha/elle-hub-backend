@@ -279,14 +279,67 @@ class TournamentService{
 
     public function getTournamentById(int $tournamentId): array
     {
-        $tournament = $this->tournamentRepository
-            ->findById($tournamentId);
+        $tournament = $this->tournamentRepository->findById($tournamentId);
 
         if ($tournament === null) {
             return [
                 "success" => false,
                 "message" => "Tournament not found."
             ];
+        }
+
+        try {
+            $conn = Database::getConnection();
+
+            // 1. Confirmed Teams
+            $stmtTeams = $conn->prepare("
+                SELECT t.team_name, t.user_id, t.district, u.email, u.profile_picture
+                FROM tournament_team_requests r
+                JOIN teams t ON r.team_user_id = t.user_id
+                JOIN users u ON t.user_id = u.user_id
+                WHERE r.tournament_id = ? AND r.status IN ('ACCEPTED', 'APPROVED')
+            ");
+            $stmtTeams->execute([$tournamentId]);
+            $tournament['confirmedTeams'] = $stmtTeams->fetchAll(PDO::FETCH_ASSOC);
+
+            // 2. Confirmed Referees
+            $stmtRefs = $conn->prepare("
+                SELECT ref.full_name AS referee_name, ref.experience_years, ref.user_id, u.email, u.profile_picture
+                FROM tournament_referee_requests r
+                JOIN referees ref ON r.referee_user_id = ref.user_id
+                JOIN users u ON ref.user_id = u.user_id
+                WHERE r.tournament_id = ? AND r.status IN ('ACCEPTED', 'APPROVED')
+            ");
+            $stmtRefs->execute([$tournamentId]);
+            $tournament['confirmedReferees'] = $stmtRefs->fetchAll(PDO::FETCH_ASSOC);
+
+            // 3. Confirmed Playground
+            $stmtPg = $conn->prepare("
+                SELECT p.playground_name, p.located_district, p.location, p.address, p.contact_number, p.user_id, u.email, u.profile_picture
+                FROM tournament_playground_requests r
+                JOIN playgrounds p ON r.playground_user_id = p.user_id
+                JOIN users u ON p.user_id = u.user_id
+                WHERE r.tournament_id = ? AND r.status IN ('ACCEPTED', 'APPROVED')
+            ");
+            $stmtPg->execute([$tournamentId]);
+            $tournament['confirmedPlaygrounds'] = $stmtPg->fetchAll(PDO::FETCH_ASSOC);
+
+            // 4. Confirmed Sponsors
+            $stmtSpon = $conn->prepare("
+                SELECT s.company_name, s.contact_person, s.user_id, u.email, u.profile_picture
+                FROM tournament_sponsor_requests r
+                JOIN sponsors s ON r.sponsor_user_id = s.user_id
+                JOIN users u ON s.user_id = u.user_id
+                WHERE r.tournament_id = ? AND r.status IN ('ACCEPTED', 'APPROVED')
+            ");
+            $stmtSpon->execute([$tournamentId]);
+            $tournament['confirmedSponsors'] = $stmtSpon->fetchAll(PDO::FETCH_ASSOC);
+
+        } catch (Exception $e) {
+            $tournament['confirmedTeams'] = [];
+            $tournament['confirmedReferees'] = [];
+            $tournament['confirmedPlaygrounds'] = [];
+            $tournament['confirmedSponsors'] = [];
         }
 
         return [
@@ -324,6 +377,19 @@ class TournamentService{
                 "message" => "Tournament details were not updated."
             ];
         }
+
+        // Trigger #3: Send notification to all tournament participants when tournament details are updated
+        try {
+            require_once __DIR__ . "/NotificationService.php";
+            $notifService = new NotificationService();
+            $title = $tournament['title'] ?? 'Tournament';
+            $notifService->sendToTournamentParticipants(
+                $tournamentId,
+                'Tournament Details Updated 📝',
+                "Details for tournament '{$title}' have been updated by the organizer.",
+                'TOURNAMENT'
+            );
+        } catch (Exception $e) {}
 
         return [
             "success" => true,
@@ -1402,6 +1468,19 @@ class TournamentService{
                 }
             }
 
+            // Trigger #5: Send notification to all tournament participants when tournament is finalized
+            try {
+                require_once __DIR__ . "/NotificationService.php";
+                $notifService = new NotificationService();
+                $title = $tournament['title'] ?? 'Elle Championship';
+                $notifService->sendToTournamentParticipants(
+                    $tournamentId,
+                    'Tournament Finalized & Locked 🏆',
+                    "Match draw for tournament '{$title}' has been finalized and locked! Check your team fixtures schedule.",
+                    'TOURNAMENT'
+                );
+            } catch (Exception $e) {}
+
             return [
                 "success" => true,
                 "message" => "Tournament setup finalized successfully! Match draw generated.",
@@ -1650,4 +1729,137 @@ class TournamentService{
         }
     }
 
+
+    // Request Tournament Deletion (Organizer)
+    public function requestTournamentDeletion(int $tournamentId, int $organizerId): array
+    {
+        try {
+            $conn = Database::getConnection();
+            $stmt = $conn->prepare("SELECT title, organizer_id FROM tournaments WHERE tournament_id = ?");
+            $stmt->execute([$tournamentId]);
+            $tournament = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$tournament) {
+                return ["success" => false, "message" => "Tournament not found."];
+            }
+
+            if ((int)$tournament['organizer_id'] !== $organizerId) {
+                return ["success" => false, "message" => "Unauthorized: Only the organizing user can request deletion."];
+            }
+
+            $stmtUp = $conn->prepare("UPDATE tournaments SET deletion_status = 'DELETION_PENDING' WHERE tournament_id = ?");
+            $stmtUp->execute([$tournamentId]);
+
+            // Send notification to Admin
+            try {
+                require_once __DIR__ . "/NotificationService.php";
+                $notifService = new NotificationService();
+                $title = $tournament['title'] ?? 'Tournament';
+                $notifService->sendToRole(
+                    'admin',
+                    'Tournament Deletion Request ⚠️',
+                    "Organizer requested to delete tournament '{$title}' (ID: {$tournamentId}). Admin review & approval required.",
+                    'TOURNAMENT'
+                );
+            } catch (Exception $e) {}
+
+            return [
+                "success" => true,
+                "message" => "Tournament deletion request submitted successfully to Admin for approval."
+            ];
+        } catch (Exception $e) {
+            return ["success" => false, "message" => "Database error: " . $e->getMessage()];
+        }
+    }
+
+    // Admin Approve Tournament Deletion (Permanently Purges Tournament)
+    public function approveTournamentDeletion(int $tournamentId, int $adminId): array
+    {
+        try {
+            $conn = Database::getConnection();
+            $stmt = $conn->prepare("SELECT title, organizer_id FROM tournaments WHERE tournament_id = ?");
+            $stmt->execute([$tournamentId]);
+            $tournament = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$tournament) {
+                return ["success" => false, "message" => "Tournament not found."];
+            }
+
+            $title = $tournament['title'] ?? 'Tournament';
+            $orgId = (int)($tournament['organizer_id'] ?? 0);
+
+            // Delete associated requests & matches
+            $conn->prepare("DELETE FROM tournament_team_requests WHERE tournament_id = ?")->execute([$tournamentId]);
+            $conn->prepare("DELETE FROM tournament_referee_requests WHERE tournament_id = ?")->execute([$tournamentId]);
+            $conn->prepare("DELETE FROM tournament_playground_requests WHERE tournament_id = ?")->execute([$tournamentId]);
+            $conn->prepare("DELETE FROM tournament_sponsor_requests WHERE tournament_id = ?")->execute([$tournamentId]);
+            $conn->prepare("DELETE FROM matches WHERE tournament_id = ?")->execute([$tournamentId]);
+
+            // Delete tournament record
+            $conn->prepare("DELETE FROM tournaments WHERE tournament_id = ?")->execute([$tournamentId]);
+
+            // Send notification to Organizer
+            if ($orgId > 0) {
+                try {
+                    require_once __DIR__ . "/NotificationService.php";
+                    $notifService = new NotificationService();
+                    $notifService->sendToUser(
+                        $orgId,
+                        'Tournament Deletion Approved',
+                        "Your request to delete tournament '{$title}' was APPROVED by Admin. The tournament has been deleted.",
+                        'TOURNAMENT'
+                    );
+                } catch (Exception $e) {}
+            }
+
+            return [
+                "success" => true,
+                "message" => "Tournament deletion approved and permanently deleted."
+            ];
+        } catch (Exception $e) {
+            return ["success" => false, "message" => "Database error: " . $e->getMessage()];
+        }
+    }
+
+    // Admin Reject Tournament Deletion (Restores Tournament to Active)
+    public function rejectTournamentDeletion(int $tournamentId, int $adminId): array
+    {
+        try {
+            $conn = Database::getConnection();
+            $stmt = $conn->prepare("SELECT title, organizer_id FROM tournaments WHERE tournament_id = ?");
+            $stmt->execute([$tournamentId]);
+            $tournament = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$tournament) {
+                return ["success" => false, "message" => "Tournament not found."];
+            }
+
+            $title = $tournament['title'] ?? 'Tournament';
+            $orgId = (int)($tournament['organizer_id'] ?? 0);
+
+            $stmtUp = $conn->prepare("UPDATE tournaments SET deletion_status = 'NONE' WHERE tournament_id = ?");
+            $stmtUp->execute([$tournamentId]);
+
+            // Send notification to Organizer
+            if ($orgId > 0) {
+                try {
+                    require_once __DIR__ . "/NotificationService.php";
+                    $notifService = new NotificationService();
+                    $notifService->sendToUser(
+                        $orgId,
+                        'Tournament Deletion Request Declined',
+                        "Your request to delete tournament '{$title}' was DECLINED by Admin. The tournament remains active.",
+                        'TOURNAMENT'
+                    );
+                } catch (Exception $e) {}
+            }
+
+            return [
+                "success" => true,
+                "message" => "Tournament deletion request rejected. Tournament retained as active."
+            ];
+        } catch (Exception $e) {
+            return ["success" => false, "message" => "Database error: " . $e->getMessage()];
+        }
+    }
 }

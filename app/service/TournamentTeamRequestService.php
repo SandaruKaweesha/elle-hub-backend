@@ -51,6 +51,30 @@ class TournamentTeamRequestService
         // 2. Save the request
         $saved = $this->repository->save($tournamentId, $teamUserId);
         if ($saved) {
+            // Trigger: Send notification to Organizer on new Team Join Request
+            try {
+                require_once __DIR__ . "/NotificationService.php";
+                $notifService = new NotificationService();
+                $tStmt = $conn->prepare("SELECT title, organizer_id FROM tournaments WHERE tournament_id = ?");
+                $tStmt->execute([$tournamentId]);
+                $tRow = $tStmt->fetch(PDO::FETCH_ASSOC);
+                $title = $tRow['title'] ?? 'Tournament';
+                $orgId = (int)($tRow['organizer_id'] ?? 0);
+
+                $teamNameStmt = $conn->prepare("SELECT COALESCE(t.team_name, u.email) FROM users u LEFT JOIN teams t ON u.user_id = t.user_id WHERE u.user_id = ?");
+                $teamNameStmt->execute([$teamUserId]);
+                $teamName = $teamNameStmt->fetchColumn() ?: 'Team';
+
+                if ($orgId > 0) {
+                    $notifService->sendToUser(
+                        $orgId,
+                        'New Team Entry Request 👥',
+                        "Team '{$teamName}' submitted a join request for your tournament '{$title}'.",
+                        'TOURNAMENT'
+                    );
+                }
+            } catch (Exception $e) {}
+
             return [
                 "success" => true,
                 "message" => "Join request submitted successfully."
@@ -283,6 +307,22 @@ class TournamentTeamRequestService
 
         $updated = $this->repository->updateStatus($tournamentId, $teamUserId, 'APPROVED');
         if ($updated) {
+            // Send notification to Team User on Application Approval
+            try {
+                require_once __DIR__ . "/NotificationService.php";
+                $notifService = new NotificationService();
+                $tStmt = $conn->prepare("SELECT title FROM tournaments WHERE tournament_id = ?");
+                $tStmt->execute([$tournamentId]);
+                $title = $tStmt->fetchColumn() ?: 'Tournament';
+
+                $notifService->sendToUser(
+                    $teamUserId,
+                    'Application Approved! 🎉',
+                    "Your team application for tournament '{$title}' has been APPROVED by the organizer!",
+                    'TOURNAMENT'
+                );
+            } catch (Exception $e) {}
+
             return [
                 "success" => true,
                 "message" => "Team request approved successfully."
@@ -314,6 +354,23 @@ class TournamentTeamRequestService
 
         $updated = $this->repository->updateStatus($tournamentId, $teamUserId, 'REJECTED');
         if ($updated) {
+            // Send notification to Team User on Application Rejection
+            try {
+                require_once __DIR__ . "/NotificationService.php";
+                $notifService = new NotificationService();
+                $conn = Database::getConnection();
+                $tStmt = $conn->prepare("SELECT title FROM tournaments WHERE tournament_id = ?");
+                $tStmt->execute([$tournamentId]);
+                $title = $tStmt->fetchColumn() ?: 'Tournament';
+
+                $notifService->sendToUser(
+                    $teamUserId,
+                    'Application Declined',
+                    "Your team application for tournament '{$title}' was declined by the organizer.",
+                    'TOURNAMENT'
+                );
+            } catch (Exception $e) {}
+
             return [
                 "success" => true,
                 "message" => "Team request rejected successfully."

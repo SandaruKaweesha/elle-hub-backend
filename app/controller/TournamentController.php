@@ -613,6 +613,40 @@ class TournamentController{
         $result = $this->tournamentService->getOrganizerHistory((int) $organizerId);
         echo json_encode($result);
     }
+
+    public function requestTournamentDeletion($tournamentId)
+    {
+        require_once __DIR__ . "/../core/AuthMiddleware.php";
+        $payload = AuthMiddleware::requireRole(['ORGANIZER']);
+        $organizerId = (int)$payload['userId'];
+
+        header("Content-Type: application/json");
+        $result = $this->tournamentService->requestTournamentDeletion((int)$tournamentId, $organizerId);
+        http_response_code($result["success"] ? 200 : 400);
+        echo json_encode($result);
+    }
+
+    public function approveTournamentDeletion($tournamentId)
+    {
+        require_once __DIR__ . "/../core/AuthMiddleware.php";
+        $payload = AuthMiddleware::requireRole(['ADMIN']);
+        $adminId = (int)$payload['userId'];
+
+        header("Content-Type: application/json");
+        $result = $this->tournamentService->approveTournamentDeletion((int)$tournamentId, $adminId);
+        http_response_code($result["success"] ? 200 : 400);
+        echo json_encode($result);
+    }
+
+    public function rejectTournamentDeletion($tournamentId)
+    {
+        require_once __DIR__ . "/../core/AuthMiddleware.php";
+        $payload = AuthMiddleware::requireRole(['ADMIN']);
+        $adminId = (int)$payload['userId'];
+
+        header("Content-Type: application/json");
+        $result = $this->tournamentService->rejectTournamentDeletion((int)$tournamentId, $adminId);
+        http_response_code($result["success"] ? 200 : 400);
+        echo json_encode($result);
+    }
 }
-
-
