@@ -130,6 +130,12 @@ class NotificationService
                 if ($u > 0) $userIds[] = (int)$u;
             }
 
+            // 6. Admins
+            $stmtAd = $this->db->query("SELECT user_id FROM users WHERE LOWER(role) = 'admin'");
+            foreach ($stmtAd->fetchAll(PDO::FETCH_COLUMN) as $u) {
+                if ($u > 0) $userIds[] = (int)$u;
+            }
+
             $uniqueUserIds = array_unique($userIds);
             if (empty($uniqueUserIds)) {
                 // Fallback: send to all active users if no participants linked yet
