@@ -1619,6 +1619,16 @@ class TournamentService{
             $drawData = null;
             if (!empty($tournament['draw_data'])) {
                 $drawData = json_decode($tournament['draw_data'], true);
+                $cachedTeamsCount = (is_array($drawData) && is_array($drawData['teams'] ?? null)) ? count($drawData['teams']) : 0;
+                $currentTeamsCount = count($participatingTeams);
+                
+                // If draw is not finalized and approved team count has changed, auto re-shuffle draw for current teams
+                if ((int)($tournament['is_draw_finalized'] ?? 0) === 0 && $cachedTeamsCount !== $currentTeamsCount && $currentTeamsCount > 0) {
+                    $shuffleRes = $this->shuffleTournamentDraw($tournamentId, 'RANDOM');
+                    if ($shuffleRes['success'] && isset($shuffleRes['data']['drawData'])) {
+                        $drawData = $shuffleRes['data']['drawData'];
+                    }
+                }
             } else if (!empty($participatingTeams)) {
                 $shuffleRes = $this->shuffleTournamentDraw($tournamentId, 'RANDOM');
                 if ($shuffleRes['success'] && isset($shuffleRes['data']['drawData'])) {
@@ -1925,6 +1935,7 @@ class TournamentService{
                 error_log("Failed sending winner announcement notification: " . $e->getMessage());
             }
 
+            $this->recalculateAllTeamRatings();
             return [
                 "success" => true,
                 "message" => "Tournament has been successfully completed and all pending requests closed!"
@@ -2232,6 +2243,194 @@ class TournamentService{
             return ["success" => false, "message" => "No active referee request found to withdraw."];
         } catch (Exception $e) {
             return ["success" => false, "message" => "Error: " . $e->getMessage()];
+        }
+    }
+
+    public function recalculateAllTeamRatings(): array
+    {
+        try {
+            $db = Database::getConnection();
+
+            $stmtTeams = $db->query("SELECT user_id, team_name FROM teams");
+            $teams = $stmtTeams->fetchAll(PDO::FETCH_ASSOC);
+
+            if (empty($teams)) {
+                return ["success" => true, "message" => "No teams found."];
+            }
+
+            $stmtTourneys = $db->query("SELECT tournament_id, title, status, is_finalized, draw_data FROM tournaments WHERE draw_data IS NOT NULL AND draw_data != ''");
+            $tournaments = $stmtTourneys->fetchAll(PDO::FETCH_ASSOC);
+
+            $norm = function($str) {
+                if (!$str) return '';
+                if (is_array($str)) {
+                    $str = $str['team_name'] ?? $str['name'] ?? '';
+                }
+                $clean = preg_replace('/\s*\(BYE\)\s*/i', '', (string)$str);
+                return preg_replace('/[^a-zA-Z0-9]/', '', strtolower($clean));
+            };
+
+            $stats = [];
+            foreach ($teams as $t) {
+                $uId = (int)$t['user_id'];
+                $cleanName = trim($t['team_name']);
+
+                $stmtP = $db->prepare("
+                    SELECT COUNT(DISTINCT tournament_id) as count 
+                    FROM tournament_team_requests 
+                    WHERE team_user_id = ? AND UPPER(status) IN ('APPROVED', 'ACCEPTED')
+                ");
+                $stmtP->execute([$uId]);
+                $tPlayed = (int)($stmtP->fetch(PDO::FETCH_ASSOC)['count'] ?? 0);
+
+                $stats[$uId] = [
+                    'user_id' => $uId,
+                    'team_name' => $cleanName,
+                    'norm_name' => $norm($cleanName),
+                    'matches_played' => 0,
+                    'wins' => 0,
+                    'losses' => 0,
+                    'draws' => 0,
+                    'tournaments_played' => $tPlayed,
+                    'tournaments_won' => 0,
+                    'points' => 0,
+                    'win_rate' => 0.00,
+                    'rating' => 0.00,
+                    'rank_position' => 0
+                ];
+            }
+
+            foreach ($tournaments as $tourney) {
+                $drawData = json_decode($tourney['draw_data'], true);
+                if (!$drawData) continue;
+
+                $matchScores = $drawData['matchScores'] ?? [];
+                $bracketWinners = $drawData['bracketWinners'] ?? [];
+                $primaryMatches = $drawData['primaryRoundMatches'] ?? [];
+
+                $matchTeamsMap = [];
+
+                if (isset($primaryMatches[0])) {
+                    $t1 = $norm($primaryMatches[0]['team1'] ?? '');
+                    $t2 = $norm($primaryMatches[0]['team2'] ?? '');
+                    if ($t1 && $t2) {
+                        $matchTeamsMap['groupA_SF'] = [$t1, $t2];
+                        $matchTeamsMap['groupA_QF1'] = [$t1, $t2];
+                    }
+                }
+
+                if (isset($primaryMatches[1])) {
+                    $t1 = $norm($primaryMatches[1]['team1'] ?? '');
+                    $t2 = $norm($primaryMatches[1]['team2'] ?? '');
+                    if ($t1 && $t2) {
+                        $matchTeamsMap['groupB_SF'] = [$t1, $t2];
+                        $matchTeamsMap['groupA_QF2'] = [$t1, $t2];
+                    }
+                }
+
+                $sfA_winner = $norm($bracketWinners['groupA_SF'] ?? '');
+                $sfB_winner = $norm($bracketWinners['groupB_SF'] ?? '');
+                if ($sfA_winner && $sfB_winner) {
+                    $matchTeamsMap['champion'] = [$sfA_winner, $sfB_winner];
+                    $matchTeamsMap['final'] = [$sfA_winner, $sfB_winner];
+                }
+
+                foreach ($matchScores as $matchKey => $scoreObj) {
+                    if (!is_array($scoreObj)) continue;
+
+                    $winnerNorm = $norm($scoreObj['winner'] ?? '');
+                    if (empty($winnerNorm)) continue;
+
+                    $t1Norm = $norm($scoreObj['team1'] ?? $scoreObj['t1'] ?? '');
+                    $t2Norm = $norm($scoreObj['team2'] ?? $scoreObj['t2'] ?? '');
+
+                    if ((empty($t1Norm) || empty($t2Norm)) && isset($matchTeamsMap[$matchKey])) {
+                        $t1Norm = $matchTeamsMap[$matchKey][0];
+                        $t2Norm = $matchTeamsMap[$matchKey][1];
+                    }
+
+                    foreach ($stats as $uId => &$s) {
+                        $nName = $s['norm_name'];
+
+                        if ($nName === $t1Norm || $nName === $t2Norm || $nName === $winnerNorm) {
+                            if ($nName === $winnerNorm) {
+                                $s['matches_played'] += 1;
+                                $s['wins'] += 1;
+                                $s['points'] += 3;
+                            } else if ($t1Norm && $t2Norm && ($nName === $t1Norm || $nName === $t2Norm)) {
+                                $s['matches_played'] += 1;
+                                $s['losses'] += 1;
+                            }
+                        }
+                    }
+                    unset($s);
+                }
+
+                $championNorm = $norm($bracketWinners['champion'] ?? $drawData['winner'] ?? '');
+                $runnerUpNorm = $norm($bracketWinners['runnerUp'] ?? '');
+
+                if (!empty($championNorm)) {
+                    foreach ($stats as $uId => &$s) {
+                        if ($s['norm_name'] === $championNorm) {
+                            $s['points'] += 10;
+                            $s['tournaments_won'] += 1;
+                        } else if (!empty($runnerUpNorm) && $s['norm_name'] === $runnerUpNorm) {
+                            $s['points'] += 5;
+                        }
+                    }
+                    unset($s);
+                }
+            }
+
+            foreach ($stats as $uId => &$s) {
+                $mp = $s['matches_played'];
+                $w = $s['wins'];
+
+                if ($mp > 0) {
+                    $s['win_rate'] = round(($w / $mp) * 100, 2);
+                    $ratingVal = 2.50 + (($s['win_rate'] / 100) * 2.00) + min(0.50, $w * 0.10);
+                    $s['rating'] = round(min(5.00, max(1.00, $ratingVal)), 1);
+                } else {
+                    $s['win_rate'] = 0.00;
+                    $s['rating'] = 0.00;
+                }
+            }
+            unset($s);
+
+            usort($stats, function($a, $b) {
+                if ($a['points'] !== $b['points']) return $b['points'] <=> $a['points'];
+                if ($a['rating'] !== $b['rating']) return $b['rating'] <=> $a['rating'];
+                if ($a['win_rate'] !== $b['win_rate']) return $b['win_rate'] <=> $a['win_rate'];
+                return $b['wins'] <=> $a['wins'];
+            });
+
+            $stmtUp = $db->prepare("
+                UPDATE teams 
+                SET points = ?, matches_played = ?, wins = ?, losses = ?, draws = ?, win_rate = ?, rating = ?, rank_position = ?, tournaments_played = ?, tournaments_won = ? 
+                WHERE user_id = ?
+            ");
+
+            $rank = 1;
+            foreach ($stats as &$s) {
+                $s['rank_position'] = $s['matches_played'] > 0 ? $rank++ : 0;
+                $stmtUp->execute([
+                    $s['points'],
+                    $s['matches_played'],
+                    $s['wins'],
+                    $s['losses'],
+                    $s['draws'],
+                    $s['win_rate'],
+                    $s['rating'],
+                    $s['rank_position'],
+                    $s['tournaments_played'],
+                    $s['tournaments_won'],
+                    $s['user_id']
+                ]);
+            }
+
+            return ["success" => true, "data" => $stats];
+        } catch (Exception $e) {
+            return ["success" => false, "message" => "Error recalculating team ratings: " . $e->getMessage()];
         }
     }
 }

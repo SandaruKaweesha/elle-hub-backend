@@ -67,7 +67,7 @@ class UserRepository{
     {
         $sql = "SELECT u.*,
                        a.full_name AS admin_name,
-                       t.team_name, t.rating, t.district,
+                       t.team_name, t.rating, t.points, t.matches_played, t.wins, t.losses, t.win_rate, t.rank_position, t.district,
                        o.organization_name,
                        s.company_name, s.contact_person AS sponsor_contact_person, s.address AS sponsor_address,
                        p.playground_name, p.located_district, p.location AS playground_location, p.address AS playground_address, p.area AS playground_area, p.area AS area, p.area AS capacity,

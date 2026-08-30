@@ -20,15 +20,13 @@ class TeamService
             $trends = ['up', 'same', 'down'];
 
             foreach ($rawTeams as $index => $row) {
-                $rank = $index + 1;
                 $played = (int) ($row['played'] ?? 0);
                 $won = (int) ($row['won'] ?? 0);
-                $baseRating = (int) ($row['rating'] ?? 100);
+                $points = (int) ($row['points'] ?? 0);
+                $rating = (float) ($row['rating'] ?? 0.0);
+                $winRate = (float) ($row['win_rate'] ?? 0.0);
+                $rank = $played > 0 ? (int)($row['rank_position'] ?? ($index + 1)) : ($index + 1);
 
-                // Compute total dynamic points (0 if team hasn't played or won any tournament yet)
-                $points = ($played > 0 || $won > 0) ? (($won * 100) + ($played * 25) + $baseRating) : 0;
-
-                // Pick trend indicator
                 $trend = ($played > 0 || $won > 0) ? $trends[($row['user_id'] ?? $index) % 3] : 'same';
 
                 $formattedTeams[] = [
@@ -40,7 +38,8 @@ class TeamService
                     'played' => $played,
                     'won' => $won,
                     'points' => $points,
-                    'rating' => $baseRating,
+                    'rating' => $rating,
+                    'win_rate' => $winRate,
                     'trend' => $trend,
                     'profilePicture' => $row['profile_picture'] ?? null
                 ];
@@ -61,6 +60,10 @@ class TeamService
     public function getTeamStats(int $userId): array
     {
         try {
+            require_once __DIR__ . "/TournamentService.php";
+            $tService = new TournamentService();
+            $tService->recalculateAllTeamRatings();
+
             $stats = $this->teamRepository->getTeamStats($userId);
             return [
                 "success" => true,

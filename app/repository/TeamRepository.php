@@ -35,48 +35,22 @@ class TeamRepository{
                     t.district,
                     t.contact_number,
                     t.rating,
+                    t.points,
+                    t.matches_played AS played,
+                    t.wins AS won,
+                    t.losses,
+                    t.win_rate,
+                    t.rank_position,
                     u.email,
                     u.profile_picture,
-                    u.status AS user_status,
-                    COALESCE(req_counts.played_count, 0) AS played,
-                    (
-                        COALESCE(win_results.won_count, 0) + 
-                        COALESCE(win_draws.won_count, 0)
-                    ) AS won
+                    u.status AS user_status
                 FROM teams t
                 JOIN users u ON t.user_id = u.user_id
-                LEFT JOIN (
-                    SELECT team_user_id, COUNT(DISTINCT tournament_id) AS played_count
-                    FROM tournament_team_requests
-                    WHERE UPPER(status) IN ('APPROVED', 'ACCEPTED', 'PENDING')
-                    GROUP BY team_user_id
-                ) req_counts ON t.user_id = req_counts.team_user_id
-                LEFT JOIN (
-                    SELECT recipient_team, COUNT(DISTINCT tournament_id) AS won_count
-                    FROM tournament_results
-                    WHERE UPPER(award_type) LIKE '%WINNER%' 
-                       OR UPPER(award_type) LIKE '%CHAMPION%' 
-                       OR UPPER(award_type) LIKE '%1ST%' 
-                       OR UPPER(award_type) LIKE '%FIRST%'
-                    GROUP BY recipient_team
-                ) win_results ON LOWER(TRIM(t.team_name)) = LOWER(TRIM(win_results.recipient_team))
-                LEFT JOIN (
-                    SELECT 
-                        LOWER(TRIM(
-                            COALESCE(
-                                NULLIF(JSON_UNQUOTE(JSON_EXTRACT(draw_data, '$.winner')), ''),
-                                NULLIF(JSON_UNQUOTE(JSON_EXTRACT(draw_data, '$.bracketWinners.champion')), '')
-                            )
-                        )) AS winner_name,
-                        COUNT(DISTINCT tournament_id) AS won_count
-                    FROM tournaments
-                    WHERE draw_data IS NOT NULL 
-                      AND draw_data != ''
-                    GROUP BY winner_name
-                ) win_draws ON LOWER(TRIM(t.team_name)) = win_draws.winner_name
                 ORDER BY 
-                    CASE WHEN (COALESCE(req_counts.played_count, 0) > 0 OR (COALESCE(win_results.won_count, 0) + COALESCE(win_draws.won_count, 0)) > 0) THEN 1 ELSE 2 END ASC,
-                    ((COALESCE(win_results.won_count, 0) + COALESCE(win_draws.won_count, 0)) * 100 + COALESCE(req_counts.played_count, 0) * 25 + COALESCE(t.rating, 0)) DESC, 
+                    CASE WHEN t.matches_played > 0 THEN 1 ELSE 2 END ASC,
+                    t.points DESC,
+                    t.rating DESC,
+                    t.win_rate DESC,
                     t.team_name ASC";
 
         $statement = $this->connection->prepare($sql);
@@ -91,41 +65,18 @@ class TeamRepository{
                     t.user_id,
                     t.team_name,
                     t.rating,
-                    COALESCE(req_counts.played_count, 0) AS played,
-                    (
-                        COALESCE(win_results.won_count, 0) + 
-                        COALESCE(win_draws.won_count, 0)
-                    ) AS won
+                    t.points,
+                    t.matches_played AS played,
+                    t.wins AS won,
+                    t.losses,
+                    t.draws,
+                    t.win_rate,
+                    t.fair_play,
+                    t.discipline,
+                    t.rank_position,
+                    t.tournaments_played,
+                    t.tournaments_won
                 FROM teams t
-                LEFT JOIN (
-                    SELECT team_user_id, COUNT(DISTINCT tournament_id) AS played_count
-                    FROM tournament_team_requests
-                    WHERE UPPER(status) IN ('APPROVED', 'ACCEPTED', 'PENDING')
-                    GROUP BY team_user_id
-                ) req_counts ON t.user_id = req_counts.team_user_id
-                LEFT JOIN (
-                    SELECT recipient_team, COUNT(DISTINCT tournament_id) AS won_count
-                    FROM tournament_results
-                    WHERE UPPER(award_type) LIKE '%WINNER%' 
-                       OR UPPER(award_type) LIKE '%CHAMPION%' 
-                       OR UPPER(award_type) LIKE '%1ST%' 
-                       OR UPPER(award_type) LIKE '%FIRST%'
-                    GROUP BY recipient_team
-                ) win_results ON LOWER(TRIM(t.team_name)) = LOWER(TRIM(win_results.recipient_team))
-                LEFT JOIN (
-                    SELECT 
-                        LOWER(TRIM(
-                            COALESCE(
-                                NULLIF(JSON_UNQUOTE(JSON_EXTRACT(draw_data, '$.winner')), ''),
-                                NULLIF(JSON_UNQUOTE(JSON_EXTRACT(draw_data, '$.bracketWinners.champion')), '')
-                            )
-                        )) AS winner_name,
-                        COUNT(DISTINCT tournament_id) AS won_count
-                    FROM tournaments
-                    WHERE draw_data IS NOT NULL 
-                      AND draw_data != ''
-                    GROUP BY winner_name
-                ) win_draws ON LOWER(TRIM(t.team_name)) = win_draws.winner_name
                 WHERE t.user_id = :user_id";
 
         $statement = $this->connection->prepare($sql);
@@ -134,51 +85,54 @@ class TeamRepository{
 
         $result = $statement->fetch(PDO::FETCH_ASSOC);
 
-        // Fallback if team row not found in teams table but user exists
         if (!$result) {
-            $fallbackStmt = $this->connection->prepare("
-                SELECT COUNT(DISTINCT tournament_id) AS played_count
-                FROM tournament_team_requests
-                WHERE team_user_id = :user_id
-                  AND UPPER(status) IN ('APPROVED', 'ACCEPTED', 'PENDING')
-            ");
-            $fallbackStmt->bindValue(":user_id", $userId, PDO::PARAM_INT);
-            $fallbackStmt->execute();
-            $fRes = $fallbackStmt->fetch(PDO::FETCH_ASSOC);
-            $played = (int) ($fRes['played_count'] ?? 0);
             return [
-                'played' => $played,
+                'played' => 0,
                 'won' => 0,
-                'losses' => $played,
+                'losses' => 0,
                 'win_rate' => 0.0,
-                'goal_progress' => $played > 0 ? min(100, (int) round(($played / 10) * 100)) : 0
+                'tournaments_played' => 0,
+                'tournaments_won' => 0,
+                'goal_progress' => 0,
+                'points' => 0,
+                'stars' => 0.0,
+                'rating' => 0.0,
+                'rank' => 0,
+                'rank_position' => 0,
+                'fair_play' => 0.0,
+                'discipline' => 0.0,
+                'reviews_count' => 0
             ];
         }
 
         $played = (int) ($result['played'] ?? 0);
         $won = (int) ($result['won'] ?? 0);
-        $losses = max(0, $played - $won);
-        $winRate = $played > 0 ? round(($won / $played) * 100, 1) : 0.0;
-        
-        $goalTarget = 10;
-        $goalProgress = $played > 0 ? min(100, (int) round(($played / $goalTarget) * 100)) : 0;
+        $losses = (int) ($result['losses'] ?? 0);
+        $winRate = (float) ($result['win_rate'] ?? 0.0);
+        $rating = (float) ($result['rating'] ?? 0.0);
+        $points = (int) ($result['points'] ?? 0);
+        $rank = (int) ($result['rank_position'] ?? 0);
+        $tournamentsPlayed = (int) ($result['tournaments_played'] ?? 0);
+        $tournamentsWon = (int) ($result['tournaments_won'] ?? 0);
 
-        // Dynamic Rating Calculations based on actual match performance
-        $points = ($played > 0 || $won > 0) ? (($won * 100) + ($played * 25)) : 0;
-        $stars = $played > 0 ? min(5.0, max(1.0, round(($won / $played) * 5.0, 1))) : 0.0;
-        $fairPlay = $played > 0 ? min(5.0, round(4.0 + ($won * 0.2), 1)) : 0.0;
-        $discipline = $played > 0 ? 5.0 : 0.0;
+        $fairPlay = $played > 0 ? (float)($result['fair_play'] ?? 4.5) : 0.0;
+        $discipline = $played > 0 ? (float)($result['discipline'] ?? 4.5) : 0.0;
         $reviewsCount = $played > 0 ? ($played * 3 + $won * 5) : 0;
+        $goalProgress = $played > 0 ? min(100, (int) round(($played / 10) * 100)) : 0;
 
         return [
             'played' => $played,
             'won' => $won,
             'losses' => $losses,
             'win_rate' => $winRate,
+            'tournaments_played' => $tournamentsPlayed,
+            'tournaments_won' => $tournamentsWon,
             'goal_progress' => $goalProgress,
             'points' => $points,
-            'stars' => $stars,
-            'rating' => $stars,
+            'stars' => $rating,
+            'rating' => $rating,
+            'rank' => $rank,
+            'rank_position' => $rank,
             'fair_play' => $fairPlay,
             'discipline' => $discipline,
             'reviews_count' => $reviewsCount
