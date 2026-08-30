@@ -119,7 +119,7 @@ class TournamentTeamRequestRepository
                 JOIN tournaments t ON r.tournament_id = t.tournament_id
                 LEFT JOIN users u ON r.team_user_id = u.user_id
                 LEFT JOIN teams tm ON r.team_user_id = tm.user_id
-                WHERE t.organizer_id = :organizer_id
+                WHERE t.organizer_id = :organizer_id AND (r.initiated_by IS NULL OR UPPER(r.initiated_by) != 'ORGANIZER')
                 ORDER BY r.request_date DESC";
 
         $statement = $this->connection->prepare($sql);

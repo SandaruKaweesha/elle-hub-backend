@@ -808,7 +808,7 @@ class TournamentService{
                 JOIN tournaments t ON tpr.tournament_id = t.tournament_id
                 JOIN users u ON tpr.playground_user_id = u.user_id
                 LEFT JOIN playgrounds p ON tpr.playground_user_id = p.user_id
-                WHERE t.organizer_id = ?
+                WHERE t.organizer_id = ? AND (tpr.initiated_by IS NULL OR UPPER(tpr.initiated_by) != 'ORGANIZER')
                 ORDER BY tpr.request_date DESC
             ");
             $stmt->execute([$organizerId]);
@@ -1001,7 +1001,7 @@ class TournamentService{
                 JOIN tournaments t ON tsr.tournament_id = t.tournament_id
                 JOIN users u ON tsr.sponsor_user_id = u.user_id
                 LEFT JOIN sponsors s ON u.user_id = s.user_id
-                WHERE t.organizer_id = ?
+                WHERE t.organizer_id = ? AND (tsr.initiated_by IS NULL OR UPPER(tsr.initiated_by) != 'ORGANIZER')
                 ORDER BY tsr.request_date DESC
             ");
             $stmt->execute([$organizerId]);
@@ -1190,7 +1190,7 @@ class TournamentService{
                     JOIN tournaments t ON r.tournament_id = t.tournament_id
                     JOIN users u ON r.referee_user_id = u.user_id
                     LEFT JOIN referees rf ON r.referee_user_id = rf.user_id
-                    WHERE t.organizer_id = ?
+                    WHERE t.organizer_id = ? AND (r.initiated_by IS NULL OR UPPER(r.initiated_by) != 'ORGANIZER')
                     ORDER BY r.request_date DESC";
             $stmt = Database::getConnection()->prepare($sql);
             $stmt->execute([$organizerId]);
@@ -1893,16 +1893,7 @@ class TournamentService{
             $db = Database::getConnection();
 
             $stmt = $db->prepare("UPDATE tournaments SET status = 'COMPLETED' WHERE tournament_id = ?");
-                        $stmt->execute([$tournamentId]);
-
-            try {
-                require_once __DIR__ . "/NotificationService.php";
-                $notifService = new NotificationService();
-                $stmtT = $conn->prepare("SELECT title FROM tournaments WHERE tournament_id = ?");
-                $stmtT->execute([$tournamentId]);
-                $tTitle = $stmtT->fetchColumn() ?: 'Tournament';
-                $notifService->sendToRole('admin', 'Tournament Deletion Requested ⚠️', "Organizer requested deletion for tournament '{$tTitle}'. Approval required.", 'TOURNAMENT');
-            } catch (Exception $e) {}
+            $stmt->execute([$tournamentId]);
 
             $stmtMatch = $db->prepare("UPDATE matches SET status = 'COMPLETED' WHERE tournament_id = ?");
             $stmtMatch->execute([$tournamentId]);
@@ -1913,7 +1904,7 @@ class TournamentService{
             $db->prepare("UPDATE tournament_sponsor_requests SET status = 'REJECTED' WHERE tournament_id = ? AND status = 'PENDING'")->execute([$tournamentId]);
             $db->prepare("UPDATE tournament_playground_requests SET status = 'REJECTED' WHERE tournament_id = ? AND status = 'PENDING'")->execute([$tournamentId]);
 
-            // Trigger #8: Broadcast Champion Winner Announcement on Tournament Completion to all participants
+            // Trigger: Broadcast Champion Winner Announcement on Tournament Completion to all participants
             try {
                 require_once __DIR__ . "/NotificationService.php";
                 $notifService = new NotificationService();
@@ -1930,7 +1921,9 @@ class TournamentService{
                     "The {$title} championship has concluded! Congratulations to {$winner} for winning the tournament!",
                     "TOURNAMENT"
                 );
-            } catch (Exception $e) {}
+            } catch (Exception $e) {
+                error_log("Failed sending winner announcement notification: " . $e->getMessage());
+            }
 
             return [
                 "success" => true,
@@ -1944,23 +1937,12 @@ class TournamentService{
         }
     }
 
-
-    // Request Tournament Deletion (Organizer)
     public function requestTournamentDeletion(int $tournamentId, int $organizerId): array
     {
         try {
             $conn = Database::getConnection();
-            $stmt = $conn->prepare("SELECT title, organizer_id FROM tournaments WHERE tournament_id = ?");
-                        $stmt->execute([$tournamentId]);
-
-            try {
-                require_once __DIR__ . "/NotificationService.php";
-                $notifService = new NotificationService();
-                $stmtT = $conn->prepare("SELECT title FROM tournaments WHERE tournament_id = ?");
-                $stmtT->execute([$tournamentId]);
-                $tTitle = $stmtT->fetchColumn() ?: 'Tournament';
-                $notifService->sendToRole('admin', 'Tournament Deletion Requested ⚠️', "Organizer requested deletion for tournament '{$tTitle}'. Approval required.", 'TOURNAMENT');
-            } catch (Exception $e) {}
+            $stmt = $conn->prepare("SELECT * FROM tournaments WHERE tournament_id = ?");
+            $stmt->execute([$tournamentId]);
             $tournament = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if (!$tournament) {
@@ -1969,6 +1951,11 @@ class TournamentService{
 
             if ((int)$tournament['organizer_id'] !== $organizerId) {
                 return ["success" => false, "message" => "Unauthorized: Only the organizing user can request deletion."];
+            }
+
+            // Check if tournament is finalized
+            if ((int)($tournament['is_finalized'] ?? 0) === 1 || (int)($tournament['is_draw_finalized'] ?? 0) === 1 || in_array(strtoupper($tournament['status'] ?? ''), ['FINALIZED', 'COMPLETED', 'FINISHED', 'ACTIVE', 'ONGOING'])) {
+                return ["success" => false, "message" => "Tournament setup is finalized! Finalized tournaments cannot be requested for deletion."];
             }
 
             $stmtUp = $conn->prepare("UPDATE tournaments SET deletion_status = 'DELETION_PENDING' WHERE tournament_id = ?");
@@ -1996,7 +1983,6 @@ class TournamentService{
         }
     }
 
-    // Admin Approve Tournament Deletion (Permanently Purges Tournament)
     public function approveTournamentDeletion(int $tournamentId, int $adminId): array
     {
         try {
