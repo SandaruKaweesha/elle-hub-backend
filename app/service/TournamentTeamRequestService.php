@@ -197,6 +197,28 @@ class TournamentTeamRequestService
 
     public function leaveTournament(int $tournamentId, int $teamUserId): array
     {
+        $conn = Database::getConnection();
+
+        // 1. Fetch tournament details and check finalization status
+        $stmtT = $conn->prepare("SELECT title, organizer_id, status, is_finalized, is_draw_finalized FROM tournaments WHERE tournament_id = ?");
+        $stmtT->execute([$tournamentId]);
+        $tRow = $stmtT->fetch(PDO::FETCH_ASSOC);
+
+        if (!$tRow) {
+            return ["success" => false, "message" => "Tournament not found."];
+        }
+
+        $isFinalized = (int)($tRow['is_finalized'] ?? 0) === 1 || 
+                       (int)($tRow['is_draw_finalized'] ?? 0) === 1 || 
+                       in_array(strtoupper((string)($tRow['status'] ?? '')), ['FINALIZED', 'COMPLETED', 'FINISHED']);
+
+        if ($isFinalized) {
+            return [
+                "success" => false,
+                "message" => "Cannot leave: The organizer has finalized the tournament. Participant list is locked."
+            ];
+        }
+
         $existing = $this->repository->findByKeys($tournamentId, $teamUserId);
         if (!$existing) {
             return [
@@ -205,24 +227,39 @@ class TournamentTeamRequestService
             ];
         }
 
-        if (strtoupper($existing['status']) !== 'APPROVED') {
+        if (strtoupper($existing['status']) !== 'APPROVED' && strtoupper($existing['status']) !== 'ACCEPTED') {
             return [
                 "success" => false,
                 "message" => "You can only leave a tournament if your registration was approved."
             ];
         }
 
-        // Check if tournament is finalized (status is not ACTIVE)
-        $tournamentStatus = strtoupper($existing['tournament_status'] ?? 'ACTIVE');
-        if ($tournamentStatus !== 'ACTIVE') {
-            return [
-                "success" => false,
-                "message" => "Cannot leave: The tournament setup has been finalized by the organizer."
-            ];
-        }
+        // Fetch team name for notification
+        $stmtTeamName = $conn->prepare("SELECT COALESCE(t.team_name, u.email, 'Team') AS team_name FROM users u LEFT JOIN teams t ON u.user_id = t.user_id WHERE u.user_id = ?");
+        $stmtTeamName->execute([$teamUserId]);
+        $teamName = $stmtTeamName->fetchColumn() ?: 'Team';
 
+        // Delete team request record
         $deleted = $this->repository->deleteRequest($tournamentId, $teamUserId);
         if ($deleted) {
+            // Trigger Notification to Organizer
+            try {
+                require_once __DIR__ . "/NotificationService.php";
+                $notif = new NotificationService();
+                $orgId = (int)($tRow['organizer_id'] ?? 0);
+                $tTitle = $tRow['title'] ?? 'Tournament';
+                if ($orgId > 0) {
+                    $notif->sendToUser(
+                        $orgId,
+                        "Team Withdrew from Tournament 🚪",
+                        "Team '{$teamName}' has withdrawn from your tournament '{$tTitle}'.",
+                        "TOURNAMENT"
+                    );
+                }
+            } catch (Exception $e) {
+                error_log("Failed to send team leave notification: " . $e->getMessage());
+            }
+
             return [
                 "success" => true,
                 "message" => "You have left the tournament successfully."

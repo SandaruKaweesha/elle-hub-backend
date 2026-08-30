@@ -336,3 +336,18 @@ $router->post(
     "/admin/tournament/{id}/reject-deletion",
     [TournamentController::class, "rejectTournamentDeletion"]
 );
+
+$router->post(
+    "/tournament/playground-request/leave",
+    [TournamentController::class, "leavePlaygroundTournament"]
+);
+
+$router->post(
+    "/tournament/sponsor-request/leave",
+    [TournamentController::class, "leaveSponsorTournament"]
+);
+
+$router->post(
+    "/tournament/referee-request/leave",
+    [TournamentController::class, "leaveRefereeTournament"]
+);
