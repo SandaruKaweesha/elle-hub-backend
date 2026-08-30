@@ -523,12 +523,28 @@ class TournamentService{
                 $stmtRefCheck = $conn->prepare("SELECT user_id FROM referees WHERE user_id = ?");
                 $stmtInsRef = $conn->prepare("INSERT INTO referees (user_id) VALUES (?)");
                 $stmt = $conn->prepare("INSERT INTO tournament_referee_requests (tournament_id, referee_user_id, status, request_date) VALUES (?, ?, 'APPROVED', NOW())");
+                $stmtT = $conn->prepare("SELECT title FROM tournaments WHERE tournament_id = ?");
+                $stmtT->execute([$tournamentId]);
+                $tTitle = $stmtT->fetchColumn() ?: 'Tournament';
+
+                require_once __DIR__ . "/NotificationService.php";
+                $notifService = new NotificationService();
+
                 foreach ($request->refereeUserIds as $rid) {
                     $stmtRefCheck->execute([$rid]);
                     if (!$stmtRefCheck->fetch()) {
                         $stmtInsRef->execute([$rid]);
                     }
                     $stmt->execute([$tournamentId, $rid]);
+
+                    try {
+                        $notifService->sendToUser(
+                            (int)$rid,
+                            'Selected for Tournament! 🛡️',
+                            "You have been selected as official match referee for tournament '{$tTitle}'.",
+                            'TOURNAMENT'
+                        );
+                    } catch (Exception $e) {}
                 }
             }
             Database::commit();
@@ -1038,6 +1054,7 @@ class TournamentService{
             $sql = "SELECT r.request_id, r.tournament_id, r.referee_user_id, r.request_date, r.status,
                            COALESCE(r.initiated_by, 'REFEREE') AS initiated_by,
                            t.title AS tournament_title, t.location, t.start_date, t.end_date, t.tournament_held_date,
+                           t.status AS tournament_status,
                            t.is_finalized, t.is_draw_finalized,
                            COALESCE(p.playground_name, NULL) AS playground_name,
                            COALESCE(p.address, p.location, NULL) AS playground_address,
@@ -1092,6 +1109,23 @@ class TournamentService{
 
             $isAssigned = ($dbStatus === 'ACCEPTED' || $dbStatus === 'APPROVED');
             $this->syncRefereeAvailability($conn, $refereeUserId, $tournamentId, $isAssigned);
+
+            if ($isAssigned) {
+                try {
+                    require_once __DIR__ . "/NotificationService.php";
+                    $notifService = new NotificationService();
+                    $stmtT = $conn->prepare("SELECT title FROM tournaments WHERE tournament_id = ?");
+                    $stmtT->execute([$tournamentId]);
+                    $tTitle = $stmtT->fetchColumn() ?: 'Tournament';
+
+                    $notifService->sendToUser(
+                        $refereeUserId,
+                        'Selected for Tournament! 🛡️',
+                        "You have been officially selected as match referee for tournament '{$tTitle}'.",
+                        'TOURNAMENT'
+                    );
+                } catch (Exception $e) {}
+            }
 
             return ["success" => true, "message" => "Referee request updated successfully"];
         } catch (Exception $e) {
