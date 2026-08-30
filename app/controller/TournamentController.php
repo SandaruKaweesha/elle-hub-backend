@@ -649,4 +649,40 @@ class TournamentController{
         http_response_code($result["success"] ? 200 : 400);
         echo json_encode($result);
     }
+
+    public function leavePlaygroundTournament()
+    {
+        $authPayload = AuthMiddleware::requireRole(['PLAYGROUND']);
+        $playgroundUserId = (int)$authPayload['userId'];
+        $requestBody = file_get_contents("php://input");
+        $req = json_decode($requestBody);
+        $tId = (int)($req->tournamentId ?? $req->tournament_id ?? 0);
+        $res = $this->tournamentService->leavePlaygroundTournament($tId, $playgroundUserId);
+        header(self::JSON_HEADER);
+        echo json_encode($res);
+    }
+
+    public function leaveSponsorTournament()
+    {
+        $authPayload = AuthMiddleware::requireRole(['SPONSOR']);
+        $sponsorUserId = (int)$authPayload['userId'];
+        $requestBody = file_get_contents("php://input");
+        $req = json_decode($requestBody);
+        $tId = (int)($req->tournamentId ?? $req->tournament_id ?? 0);
+        $res = $this->tournamentService->leaveSponsorTournament($tId, $sponsorUserId);
+        header(self::JSON_HEADER);
+        echo json_encode($res);
+    }
+
+    public function leaveRefereeTournament()
+    {
+        $authPayload = AuthMiddleware::requireRole(['REFEREE']);
+        $refereeUserId = (int)$authPayload['userId'];
+        $requestBody = file_get_contents("php://input");
+        $req = json_decode($requestBody);
+        $tId = (int)($req->tournamentId ?? $req->tournament_id ?? 0);
+        $res = $this->tournamentService->leaveRefereeTournament($tId, $refereeUserId);
+        header(self::JSON_HEADER);
+        echo json_encode($res);
+    }
 }

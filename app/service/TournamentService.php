@@ -57,21 +57,33 @@ class TournamentService{
      */
     public function getPendingTournaments(): array
     {
-        $rows = $this->tournamentRepository->findByStatus("PENDING");
+        try {
+            $conn = Database::getConnection();
+            $stmt = $conn->prepare("
+                SELECT t.*, 
+                       COALESCE(o.organization_name, u.email, 'Elle Organizer') AS organizer_name,
+                       COALESCE(o.contact_number, 'Available on Request') AS contact_number,
+                       u.email
+                FROM tournaments t
+                LEFT JOIN users u ON t.organizer_id = u.user_id
+                LEFT JOIN organizers o ON t.organizer_id = o.user_id
+                WHERE t.approval_status = 'PENDING' OR t.status = 'PENDING'
+                ORDER BY t.created_at DESC
+            ");
+            $stmt->execute();
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        if (empty($rows)) {
             return [
                 "success" => true,
-                "message" => "No pending tournaments found.",
-                "data" => []
+                "message" => "Pending tournaments retrieved successfully.",
+                "data" => $rows
+            ];
+        } catch (Exception $e) {
+            return [
+                "success" => false,
+                "message" => $e->getMessage()
             ];
         }
-
-        return [
-            "success" => true,
-            "message" => "Pending tournaments retrieved successfully.",
-            "data" => $rows
-        ];
     }
 
     /**
@@ -366,6 +378,16 @@ class TournamentService{
             ];
         }
 
+        $isFinalized = (int)($tournament['is_finalized'] ?? $tournament['is_draw_finalized'] ?? 0) === 1 || 
+                       in_array(strtoupper($tournament['status'] ?? ''), ['FINALIZED', 'COMPLETED', 'FINISHED'], true);
+
+        if ($isFinalized) {
+            return [
+                "success" => false,
+                "message" => "Cannot update tournament details after it has been finalized and locked."
+            ];
+        }
+
         $updated = $this->tournamentRepository->update(
             $tournamentId,
             $request
@@ -459,32 +481,34 @@ class TournamentService{
     public function getTournamentAssignments(int $tournamentId): array
     {
         try {
+            $db = Database::getConnection();
+
             $teamUserIds = [];
-            $stmt = Database::getConnection()->prepare("SELECT team_user_id FROM tournament_team_requests WHERE tournament_id = ? AND status = 'APPROVED'");
+            $stmt = $db->prepare("SELECT team_user_id FROM tournament_team_requests WHERE tournament_id = ? AND (status = 'APPROVED' OR status = 'ACCEPTED')");
             $stmt->execute([$tournamentId]);
             while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                $teamUserIds[] = $row['team_user_id'];
+                $teamUserIds[] = (int) $row['team_user_id'];
             }
 
             $refereeUserIds = [];
-            $stmt = Database::getConnection()->prepare("SELECT referee_user_id FROM tournament_referee_requests WHERE tournament_id = ? AND status = 'APPROVED'");
+            $stmt = $db->prepare("SELECT referee_user_id FROM tournament_referee_requests WHERE tournament_id = ? AND (status = 'APPROVED' OR status = 'ACCEPTED')");
             $stmt->execute([$tournamentId]);
             while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                $refereeUserIds[] = $row['referee_user_id'];
+                $refereeUserIds[] = (int) $row['referee_user_id'];
             }
 
             $sponsorUserIds = [];
-            $stmt = Database::getConnection()->prepare("SELECT sponsor_user_id FROM tournament_sponsor_requests WHERE tournament_id = ? AND status = 'APPROVED'");
+            $stmt = $db->prepare("SELECT sponsor_user_id FROM tournament_sponsor_requests WHERE tournament_id = ? AND (status = 'APPROVED' OR status = 'ACCEPTED')");
             $stmt->execute([$tournamentId]);
             while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                $sponsorUserIds[] = $row['sponsor_user_id'];
+                $sponsorUserIds[] = (int) $row['sponsor_user_id'];
             }
 
             $playgroundUserId = null;
-            $stmt = Database::getConnection()->prepare("SELECT playground_user_id FROM tournament_playground_requests WHERE tournament_id = ? AND status = 'APPROVED' LIMIT 1");
+            $stmt = $db->prepare("SELECT playground_user_id FROM tournament_playground_requests WHERE tournament_id = ? AND (status = 'APPROVED' OR status = 'ACCEPTED') LIMIT 1");
             $stmt->execute([$tournamentId]);
             if ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                $playgroundUserId = $row['playground_user_id'];
+                $playgroundUserId = (int) $row['playground_user_id'];
             }
 
             return [
@@ -523,12 +547,28 @@ class TournamentService{
                 $stmtRefCheck = $conn->prepare("SELECT user_id FROM referees WHERE user_id = ?");
                 $stmtInsRef = $conn->prepare("INSERT INTO referees (user_id) VALUES (?)");
                 $stmt = $conn->prepare("INSERT INTO tournament_referee_requests (tournament_id, referee_user_id, status, request_date) VALUES (?, ?, 'APPROVED', NOW())");
+                $stmtT = $conn->prepare("SELECT title FROM tournaments WHERE tournament_id = ?");
+                $stmtT->execute([$tournamentId]);
+                $tTitle = $stmtT->fetchColumn() ?: 'Tournament';
+
+                require_once __DIR__ . "/NotificationService.php";
+                $notifService = new NotificationService();
+
                 foreach ($request->refereeUserIds as $rid) {
                     $stmtRefCheck->execute([$rid]);
                     if (!$stmtRefCheck->fetch()) {
                         $stmtInsRef->execute([$rid]);
                     }
                     $stmt->execute([$tournamentId, $rid]);
+
+                    try {
+                        $notifService->sendToUser(
+                            (int)$rid,
+                            'Selected for Tournament! 🛡️',
+                            "You have been selected as official match referee for tournament '{$tTitle}'.",
+                            'TOURNAMENT'
+                        );
+                    } catch (Exception $e) {}
                 }
             }
             Database::commit();
@@ -550,7 +590,16 @@ class TournamentService{
                 LEFT JOIN tournament_playground_requests tpr 
                        ON p.user_id = tpr.playground_user_id AND tpr.tournament_id = ?
             ");
-            $stmt->execute([$tournamentId]);
+                        $stmt->execute([$tournamentId]);
+
+            try {
+                require_once __DIR__ . "/NotificationService.php";
+                $notifService = new NotificationService();
+                $stmtT = $conn->prepare("SELECT title FROM tournaments WHERE tournament_id = ?");
+                $stmtT->execute([$tournamentId]);
+                $tTitle = $stmtT->fetchColumn() ?: 'Tournament';
+                $notifService->sendToRole('admin', 'Tournament Deletion Requested ⚠️', "Organizer requested deletion for tournament '{$tTitle}'. Approval required.", 'TOURNAMENT');
+            } catch (Exception $e) {}
             $playgrounds = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             return ["success" => true, "data" => $playgrounds];
@@ -607,6 +656,28 @@ class TournamentService{
             $stmt = $conn->prepare("INSERT INTO tournament_playground_requests (tournament_id, playground_user_id, status, initiated_by, request_date) VALUES (?, ?, 'PENDING', ?, NOW())");
             $stmt->execute([$tournamentId, $playgroundUserId, $initiatedBy]);
 
+            try {
+                require_once __DIR__ . "/NotificationService.php";
+                $notif = new NotificationService();
+                $stmtT = $conn->prepare("SELECT organizer_id, title FROM tournaments WHERE tournament_id = ?");
+                $stmtT->execute([$tournamentId]);
+                $tRow = $stmtT->fetch(PDO::FETCH_ASSOC);
+                $orgId = (int)($tRow['organizer_id'] ?? 0);
+                $tTitle = $tRow['title'] ?? 'Tournament';
+
+                $stmtP = $conn->prepare("SELECT COALESCE(p.playground_name, u.email, 'Playground Venue') AS pg_name FROM users u LEFT JOIN playgrounds p ON u.user_id = p.user_id WHERE u.user_id = ?");
+                $stmtP->execute([$playgroundUserId]);
+                $pName = $stmtP->fetchColumn() ?: 'Playground Venue';
+
+                if (strtoupper($initiatedBy) === 'PLAYGROUND' && $orgId > 0) {
+                    $notif->sendToUser($orgId, "Playground Booking Request 🏟️", "Playground venue '{$pName}' submitted a venue request for your tournament '{$tTitle}'.", 'TOURNAMENT');
+                } else if (strtoupper($initiatedBy) === 'ORGANIZER') {
+                    $notif->sendToUser($playgroundUserId, "Playground Booking Request 🏟️", "Organizer sent you a venue booking request for tournament '{$tTitle}'.", 'TOURNAMENT');
+                }
+            } catch (Exception $e) {
+                error_log("Failed sending notification: " . $e->getMessage());
+            }
+
             return ["success" => true, "message" => "Request sent successfully"];
         } catch (Exception $e) {
             return ["success" => false, "message" => $e->getMessage()];
@@ -622,6 +693,26 @@ class TournamentService{
 
             $stmt = $conn->prepare("UPDATE tournament_playground_requests SET status = ? WHERE tournament_id = ? AND playground_user_id = ?");
             $stmt->execute([$dbStatus, $tournamentId, $playgroundUserId]);
+
+            try {
+                require_once __DIR__ . "/NotificationService.php";
+                $notif = new NotificationService();
+                $stmtT = $conn->prepare("SELECT organizer_id, title FROM tournaments WHERE tournament_id = ?");
+                $stmtT->execute([$tournamentId]);
+                $tRow = $stmtT->fetch(PDO::FETCH_ASSOC);
+                $orgId = (int)($tRow['organizer_id'] ?? 0);
+                $tTitle = $tRow['title'] ?? 'Tournament';
+
+                $stmtP = $conn->prepare("SELECT COALESCE(p.playground_name, u.email, 'Playground Venue') AS pg_name FROM users u LEFT JOIN playgrounds p ON u.user_id = p.user_id WHERE u.user_id = ?");
+                $stmtP->execute([$playgroundUserId]);
+                $pName = $stmtP->fetchColumn() ?: 'Playground Venue';
+
+                if ($orgId > 0) {
+                    $notif->sendToUser($orgId, "Playground Booking Update 🏟️", "Playground venue '{$pName}' {$dbStatus} your venue booking request for tournament '{$tTitle}'.", 'TOURNAMENT');
+                }
+            } catch (Exception $e) {
+                error_log("Failed sending notification: " . $e->getMessage());
+            }
 
             if ($dbStatus === 'ACCEPTED' || $dbStatus === 'APPROVED') {
                 // Fetch tournament date
@@ -717,7 +808,7 @@ class TournamentService{
                 JOIN tournaments t ON tpr.tournament_id = t.tournament_id
                 JOIN users u ON tpr.playground_user_id = u.user_id
                 LEFT JOIN playgrounds p ON tpr.playground_user_id = p.user_id
-                WHERE t.organizer_id = ?
+                WHERE t.organizer_id = ? AND (tpr.initiated_by IS NULL OR UPPER(tpr.initiated_by) != 'ORGANIZER')
                 ORDER BY tpr.request_date DESC
             ");
             $stmt->execute([$organizerId]);
@@ -742,7 +833,16 @@ class TournamentService{
                        ON u.user_id = tsr.sponsor_user_id AND tsr.tournament_id = ?
                 WHERE u.role = 'SPONSOR' AND u.status = 'APPROVED'
             ");
-            $stmt->execute([$tournamentId]);
+                        $stmt->execute([$tournamentId]);
+
+            try {
+                require_once __DIR__ . "/NotificationService.php";
+                $notifService = new NotificationService();
+                $stmtT = $conn->prepare("SELECT title FROM tournaments WHERE tournament_id = ?");
+                $stmtT->execute([$tournamentId]);
+                $tTitle = $stmtT->fetchColumn() ?: 'Tournament';
+                $notifService->sendToRole('admin', 'Tournament Deletion Requested ⚠️', "Organizer requested deletion for tournament '{$tTitle}'. Approval required.", 'TOURNAMENT');
+            } catch (Exception $e) {}
             $sponsors = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             return ["success" => true, "data" => $sponsors];
@@ -791,6 +891,28 @@ class TournamentService{
             $stmt = $conn->prepare("INSERT INTO tournament_sponsor_requests (tournament_id, sponsor_user_id, status, initiated_by, request_date) VALUES (?, ?, 'PENDING', ?, NOW())");
             $stmt->execute([$tournamentId, $sponsorUserId, $initiatedBy]);
 
+            try {
+                require_once __DIR__ . "/NotificationService.php";
+                $notif = new NotificationService();
+                $stmtT = $conn->prepare("SELECT organizer_id, title FROM tournaments WHERE tournament_id = ?");
+                $stmtT->execute([$tournamentId]);
+                $tRow = $stmtT->fetch(PDO::FETCH_ASSOC);
+                $orgId = (int)($tRow['organizer_id'] ?? 0);
+                $tTitle = $tRow['title'] ?? 'Tournament';
+
+                $stmtS = $conn->prepare("SELECT COALESCE(s.company_name, u.email, 'Corporate Sponsor') AS sponsor_name FROM users u LEFT JOIN sponsors s ON u.user_id = s.user_id WHERE u.user_id = ?");
+                $stmtS->execute([$sponsorUserId]);
+                $sName = $stmtS->fetchColumn() ?: 'Corporate Sponsor';
+
+                if (strtoupper($initiatedBy) === 'SPONSOR' && $orgId > 0) {
+                    $notif->sendToUser($orgId, "New Sponsorship Offer 💰", "Sponsor '{$sName}' submitted a sponsorship offer for your tournament '{$tTitle}'.", 'TOURNAMENT');
+                } else if (strtoupper($initiatedBy) === 'ORGANIZER') {
+                    $notif->sendToUser($sponsorUserId, "Sponsorship Request Received 💰", "Organizer sent you a sponsorship request for tournament '{$tTitle}'.", 'TOURNAMENT');
+                }
+            } catch (Exception $e) {
+                error_log("Failed sending notification: " . $e->getMessage());
+            }
+
             return ["success" => true, "message" => "Request sent successfully"];
         } catch (Exception $e) {
             return ["success" => false, "message" => $e->getMessage()];
@@ -814,6 +936,26 @@ class TournamentService{
             $stmt = $conn->prepare("UPDATE tournament_sponsor_requests SET status = ? WHERE tournament_id = ? AND sponsor_user_id = ?");
             $stmt->execute([$dbStatus, $tournamentId, $sponsorUserId]);
 
+            try {
+                require_once __DIR__ . "/NotificationService.php";
+                $notif = new NotificationService();
+                $stmtT = $conn->prepare("SELECT organizer_id, title FROM tournaments WHERE tournament_id = ?");
+                $stmtT->execute([$tournamentId]);
+                $tRow = $stmtT->fetch(PDO::FETCH_ASSOC);
+                $orgId = (int)($tRow['organizer_id'] ?? 0);
+                $tTitle = $tRow['title'] ?? 'Tournament';
+
+                $stmtS = $conn->prepare("SELECT COALESCE(s.company_name, u.email, 'Corporate Sponsor') AS sponsor_name FROM users u LEFT JOIN sponsors s ON u.user_id = s.user_id WHERE u.user_id = ?");
+                $stmtS->execute([$sponsorUserId]);
+                $sName = $stmtS->fetchColumn() ?: 'Corporate Sponsor';
+
+                if ($orgId > 0) {
+                    $notif->sendToUser($orgId, "Sponsorship Request Update 💰", "Sponsor '{$sName}' {$dbStatus} your sponsorship request for tournament '{$tTitle}'.", 'TOURNAMENT');
+                }
+            } catch (Exception $e) {
+                error_log("Failed sending notification: " . $e->getMessage());
+            }
+
             return ["success" => true, "message" => "Request updated successfully to {$dbStatus}"];
         } catch (Exception $e) {
             return ["success" => false, "message" => $e->getMessage()];
@@ -828,6 +970,7 @@ class TournamentService{
             $stmt = $conn->prepare("
                 SELECT tsr.request_id, tsr.tournament_id, tsr.sponsor_user_id, tsr.request_date, tsr.status, tsr.initiated_by,
                        t.title AS tournament_title, t.location, t.start_date, t.end_date, t.tournament_held_date, t.status AS tournament_status,
+                       t.is_finalized, t.is_draw_finalized,
                        COALESCE(o.organization_name, 'Elle Sports Association') AS organizer_name,
                        COALESCE(o.contact_number, 'Available on Request') AS contact_number
                 FROM tournament_sponsor_requests tsr
@@ -858,7 +1001,7 @@ class TournamentService{
                 JOIN tournaments t ON tsr.tournament_id = t.tournament_id
                 JOIN users u ON tsr.sponsor_user_id = u.user_id
                 LEFT JOIN sponsors s ON u.user_id = s.user_id
-                WHERE t.organizer_id = ?
+                WHERE t.organizer_id = ? AND (tsr.initiated_by IS NULL OR UPPER(tsr.initiated_by) != 'ORGANIZER')
                 ORDER BY tsr.request_date DESC
             ");
             $stmt->execute([$organizerId]);
@@ -901,14 +1044,16 @@ class TournamentService{
     public function getRefereeRequests(int $tournamentId): array
     {
         try {
+            $conn = Database::getConnection();
             $sql = "SELECT r.request_id, r.tournament_id, r.referee_user_id, r.request_date, r.status, r.initiated_by,
+                           u.email, COALESCE(rf.full_name, u.email) AS referee_name,
                            COALESCE(rf.full_name, 'Referee') AS display_name, COALESCE(rf.contact_number, 'N/A') AS phone, rf.rating, rf.experience_years
                     FROM tournament_referee_requests r
                     JOIN users u ON r.referee_user_id = u.user_id
                     LEFT JOIN referees rf ON r.referee_user_id = rf.user_id
                     WHERE r.tournament_id = ?
                     ORDER BY r.request_date DESC";
-            $stmt = Database::getConnection()->prepare($sql);
+            $stmt = $conn->prepare($sql);
             $stmt->execute([$tournamentId]);
             return ["success" => true, "data" => $stmt->fetchAll(PDO::FETCH_ASSOC)];
         } catch (Exception $e) {
@@ -1004,6 +1149,29 @@ class TournamentService{
 
             $stmt = $conn->prepare("INSERT INTO tournament_referee_requests (tournament_id, referee_user_id, status, request_date, initiated_by) VALUES (?, ?, 'PENDING', NOW(), ?)");
             $stmt->execute([$tournamentId, $refereeUserId, $initiatedBy]);
+
+            try {
+                require_once __DIR__ . "/NotificationService.php";
+                $notif = new NotificationService();
+                $stmtOrg = $conn->prepare("SELECT organizer_id, title FROM tournaments WHERE tournament_id = ?");
+                $stmtOrg->execute([$tournamentId]);
+                $tData = $stmtOrg->fetch(PDO::FETCH_ASSOC);
+                $orgId = (int)($tData['organizer_id'] ?? 0);
+                $tTitle = $tData['title'] ?? 'Tournament';
+
+                $stmtRName = $conn->prepare("SELECT COALESCE(r.full_name, u.email, 'Referee') AS r_name FROM users u LEFT JOIN referees r ON u.user_id = r.user_id WHERE u.user_id = ?");
+                $stmtRName->execute([$refereeUserId]);
+                $rName = $stmtRName->fetchColumn() ?: 'Referee';
+
+                if (strtoupper($initiatedBy) === 'REFEREE' && $orgId > 0) {
+                    $notif->sendToUser($orgId, "Referee Officiating Request 🛡️", "Referee '{$rName}' submitted an officiating request for your tournament '{$tTitle}'.", 'TOURNAMENT');
+                } else if (strtoupper($initiatedBy) === 'ORGANIZER') {
+                    $notif->sendToUser($refereeUserId, "Referee Officiating Request 🛡️", "Organizer sent you an officiating request for tournament '{$tTitle}'.", 'TOURNAMENT');
+                }
+            } catch (Exception $e) {
+                error_log("Failed sending referee request notification: " . $e->getMessage());
+            }
+
             return ["success" => true, "message" => "Referee request submitted successfully"];
         } catch (Exception $e) {
             return ["success" => false, "message" => $e->getMessage()];
@@ -1022,7 +1190,7 @@ class TournamentService{
                     JOIN tournaments t ON r.tournament_id = t.tournament_id
                     JOIN users u ON r.referee_user_id = u.user_id
                     LEFT JOIN referees rf ON r.referee_user_id = rf.user_id
-                    WHERE t.organizer_id = ?
+                    WHERE t.organizer_id = ? AND (r.initiated_by IS NULL OR UPPER(r.initiated_by) != 'ORGANIZER')
                     ORDER BY r.request_date DESC";
             $stmt = Database::getConnection()->prepare($sql);
             $stmt->execute([$organizerId]);
@@ -1038,6 +1206,7 @@ class TournamentService{
             $sql = "SELECT r.request_id, r.tournament_id, r.referee_user_id, r.request_date, r.status,
                            COALESCE(r.initiated_by, 'REFEREE') AS initiated_by,
                            t.title AS tournament_title, t.location, t.start_date, t.end_date, t.tournament_held_date,
+                           t.status AS tournament_status,
                            t.is_finalized, t.is_draw_finalized,
                            COALESCE(p.playground_name, NULL) AS playground_name,
                            COALESCE(p.address, p.location, NULL) AS playground_address,
@@ -1093,6 +1262,23 @@ class TournamentService{
             $isAssigned = ($dbStatus === 'ACCEPTED' || $dbStatus === 'APPROVED');
             $this->syncRefereeAvailability($conn, $refereeUserId, $tournamentId, $isAssigned);
 
+            if ($isAssigned) {
+                try {
+                    require_once __DIR__ . "/NotificationService.php";
+                    $notifService = new NotificationService();
+                    $stmtT = $conn->prepare("SELECT title FROM tournaments WHERE tournament_id = ?");
+                    $stmtT->execute([$tournamentId]);
+                    $tTitle = $stmtT->fetchColumn() ?: 'Tournament';
+
+                    $notifService->sendToUser(
+                        $refereeUserId,
+                        'Selected for Tournament! 🛡️',
+                        "You have been officially selected as match referee for tournament '{$tTitle}'.",
+                        'TOURNAMENT'
+                    );
+                } catch (Exception $e) {}
+            }
+
             return ["success" => true, "message" => "Referee request updated successfully"];
         } catch (Exception $e) {
             return ["success" => false, "message" => $e->getMessage()];
@@ -1117,7 +1303,16 @@ class TournamentService{
     {
         try {
             $stmt = $conn->prepare("SELECT tournament_held_date, start_date FROM tournaments WHERE tournament_id = ?");
-            $stmt->execute([$tournamentId]);
+                        $stmt->execute([$tournamentId]);
+
+            try {
+                require_once __DIR__ . "/NotificationService.php";
+                $notifService = new NotificationService();
+                $stmtT = $conn->prepare("SELECT title FROM tournaments WHERE tournament_id = ?");
+                $stmtT->execute([$tournamentId]);
+                $tTitle = $stmtT->fetchColumn() ?: 'Tournament';
+                $notifService->sendToRole('admin', 'Tournament Deletion Requested ⚠️', "Organizer requested deletion for tournament '{$tTitle}'. Approval required.", 'TOURNAMENT');
+            } catch (Exception $e) {}
             $t = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if (!$t) return;
@@ -1343,7 +1538,16 @@ class TournamentService{
         try {
             $conn = Database::getConnection();
             $stmt = $conn->prepare("SELECT DISTINCT referee_user_id FROM tournament_referee_requests WHERE tournament_id = ? AND status IN ('ACCEPTED', 'APPROVED')");
-            $stmt->execute([$tournamentId]);
+                        $stmt->execute([$tournamentId]);
+
+            try {
+                require_once __DIR__ . "/NotificationService.php";
+                $notifService = new NotificationService();
+                $stmtT = $conn->prepare("SELECT title FROM tournaments WHERE tournament_id = ?");
+                $stmtT->execute([$tournamentId]);
+                $tTitle = $stmtT->fetchColumn() ?: 'Tournament';
+                $notifService->sendToRole('admin', 'Tournament Deletion Requested ⚠️', "Organizer requested deletion for tournament '{$tTitle}'. Approval required.", 'TOURNAMENT');
+            } catch (Exception $e) {}
             $referees = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             foreach ($referees as $ref) {
@@ -1415,6 +1619,16 @@ class TournamentService{
             $drawData = null;
             if (!empty($tournament['draw_data'])) {
                 $drawData = json_decode($tournament['draw_data'], true);
+                $cachedTeamsCount = (is_array($drawData) && is_array($drawData['teams'] ?? null)) ? count($drawData['teams']) : 0;
+                $currentTeamsCount = count($participatingTeams);
+                
+                // If draw is not finalized and approved team count has changed, auto re-shuffle draw for current teams
+                if ((int)($tournament['is_draw_finalized'] ?? 0) === 0 && $cachedTeamsCount !== $currentTeamsCount && $currentTeamsCount > 0) {
+                    $shuffleRes = $this->shuffleTournamentDraw($tournamentId, 'RANDOM');
+                    if ($shuffleRes['success'] && isset($shuffleRes['data']['drawData'])) {
+                        $drawData = $shuffleRes['data']['drawData'];
+                    }
+                }
             } else if (!empty($participatingTeams)) {
                 $shuffleRes = $this->shuffleTournamentDraw($tournamentId, 'RANDOM');
                 if ($shuffleRes['success'] && isset($shuffleRes['data']['drawData'])) {
@@ -1453,7 +1667,7 @@ class TournamentService{
                 return ["success" => false, "message" => "Tournament not found"];
             }
 
-            // Update status to ACTIVE/ONGOING and is_finalized = 1
+            // Update status to ACTIVE and is_finalized = 1
             $stmtUpdate = $db->prepare("UPDATE tournaments SET status = 'ACTIVE', is_finalized = 1 WHERE tournament_id = ?");
             $stmtUpdate->execute([$tournamentId]);
 
@@ -1468,7 +1682,7 @@ class TournamentService{
                 }
             }
 
-            // Trigger #5: Send notification to all tournament participants when tournament is finalized
+            // Send notification to all tournament participants when tournament is finalized
             try {
                 require_once __DIR__ . "/NotificationService.php";
                 $notifService = new NotificationService();
@@ -1479,7 +1693,9 @@ class TournamentService{
                     "Match draw for tournament '{$title}' has been finalized and locked! Check your team fixtures schedule.",
                     'TOURNAMENT'
                 );
-            } catch (Exception $e) {}
+            } catch (Exception $e) {
+                error_log("Failed sending finalization notification: " . $e->getMessage());
+            }
 
             return [
                 "success" => true,
@@ -1698,7 +1914,7 @@ class TournamentService{
             $db->prepare("UPDATE tournament_sponsor_requests SET status = 'REJECTED' WHERE tournament_id = ? AND status = 'PENDING'")->execute([$tournamentId]);
             $db->prepare("UPDATE tournament_playground_requests SET status = 'REJECTED' WHERE tournament_id = ? AND status = 'PENDING'")->execute([$tournamentId]);
 
-            // Trigger #8: Broadcast Champion Winner Announcement on Tournament Completion to all participants
+            // Trigger: Broadcast Champion Winner Announcement on Tournament Completion to all participants
             try {
                 require_once __DIR__ . "/NotificationService.php";
                 $notifService = new NotificationService();
@@ -1715,8 +1931,11 @@ class TournamentService{
                     "The {$title} championship has concluded! Congratulations to {$winner} for winning the tournament!",
                     "TOURNAMENT"
                 );
-            } catch (Exception $e) {}
+            } catch (Exception $e) {
+                error_log("Failed sending winner announcement notification: " . $e->getMessage());
+            }
 
+            $this->recalculateAllTeamRatings();
             return [
                 "success" => true,
                 "message" => "Tournament has been successfully completed and all pending requests closed!"
@@ -1729,13 +1948,11 @@ class TournamentService{
         }
     }
 
-
-    // Request Tournament Deletion (Organizer)
     public function requestTournamentDeletion(int $tournamentId, int $organizerId): array
     {
         try {
             $conn = Database::getConnection();
-            $stmt = $conn->prepare("SELECT title, organizer_id FROM tournaments WHERE tournament_id = ?");
+            $stmt = $conn->prepare("SELECT * FROM tournaments WHERE tournament_id = ?");
             $stmt->execute([$tournamentId]);
             $tournament = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -1745,6 +1962,11 @@ class TournamentService{
 
             if ((int)$tournament['organizer_id'] !== $organizerId) {
                 return ["success" => false, "message" => "Unauthorized: Only the organizing user can request deletion."];
+            }
+
+            // Check if tournament is finalized
+            if ((int)($tournament['is_finalized'] ?? 0) === 1 || (int)($tournament['is_draw_finalized'] ?? 0) === 1 || in_array(strtoupper($tournament['status'] ?? ''), ['FINALIZED', 'COMPLETED', 'FINISHED', 'ACTIVE', 'ONGOING'])) {
+                return ["success" => false, "message" => "Tournament setup is finalized! Finalized tournaments cannot be requested for deletion."];
             }
 
             $stmtUp = $conn->prepare("UPDATE tournaments SET deletion_status = 'DELETION_PENDING' WHERE tournament_id = ?");
@@ -1772,13 +1994,21 @@ class TournamentService{
         }
     }
 
-    // Admin Approve Tournament Deletion (Permanently Purges Tournament)
     public function approveTournamentDeletion(int $tournamentId, int $adminId): array
     {
         try {
             $conn = Database::getConnection();
             $stmt = $conn->prepare("SELECT title, organizer_id FROM tournaments WHERE tournament_id = ?");
-            $stmt->execute([$tournamentId]);
+                        $stmt->execute([$tournamentId]);
+
+            try {
+                require_once __DIR__ . "/NotificationService.php";
+                $notifService = new NotificationService();
+                $stmtT = $conn->prepare("SELECT title FROM tournaments WHERE tournament_id = ?");
+                $stmtT->execute([$tournamentId]);
+                $tTitle = $stmtT->fetchColumn() ?: 'Tournament';
+                $notifService->sendToRole('admin', 'Tournament Deletion Requested ⚠️', "Organizer requested deletion for tournament '{$tTitle}'. Approval required.", 'TOURNAMENT');
+            } catch (Exception $e) {}
             $tournament = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if (!$tournament) {
@@ -1827,7 +2057,16 @@ class TournamentService{
         try {
             $conn = Database::getConnection();
             $stmt = $conn->prepare("SELECT title, organizer_id FROM tournaments WHERE tournament_id = ?");
-            $stmt->execute([$tournamentId]);
+                        $stmt->execute([$tournamentId]);
+
+            try {
+                require_once __DIR__ . "/NotificationService.php";
+                $notifService = new NotificationService();
+                $stmtT = $conn->prepare("SELECT title FROM tournaments WHERE tournament_id = ?");
+                $stmtT->execute([$tournamentId]);
+                $tTitle = $stmtT->fetchColumn() ?: 'Tournament';
+                $notifService->sendToRole('admin', 'Tournament Deletion Requested ⚠️', "Organizer requested deletion for tournament '{$tTitle}'. Approval required.", 'TOURNAMENT');
+            } catch (Exception $e) {}
             $tournament = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if (!$tournament) {
@@ -1860,6 +2099,338 @@ class TournamentService{
             ];
         } catch (Exception $e) {
             return ["success" => false, "message" => "Database error: " . $e->getMessage()];
+        }
+    }
+
+    public function leavePlaygroundTournament(int $tournamentId, int $playgroundUserId): array
+    {
+        try {
+            $conn = Database::getConnection();
+
+            $stmtT = $conn->prepare("SELECT title, organizer_id, status, is_finalized, is_draw_finalized FROM tournaments WHERE tournament_id = ?");
+            $stmtT->execute([$tournamentId]);
+            $tRow = $stmtT->fetch(PDO::FETCH_ASSOC);
+
+            if (!$tRow) {
+                return ["success" => false, "message" => "Tournament not found."];
+            }
+
+            $isFinalized = (int)($tRow['is_finalized'] ?? 0) === 1 || 
+                           (int)($tRow['is_draw_finalized'] ?? 0) === 1 || 
+                           in_array(strtoupper((string)($tRow['status'] ?? '')), ['FINALIZED', 'COMPLETED', 'FINISHED']);
+
+            if ($isFinalized) {
+                return ["success" => false, "message" => "Cannot leave: The tournament setup has been finalized by the organizer."];
+            }
+
+            $stmtP = $conn->prepare("SELECT COALESCE(p.playground_name, u.email, 'Playground Venue') AS pg_name FROM users u LEFT JOIN playgrounds p ON u.user_id = p.user_id WHERE u.user_id = ?");
+            $stmtP->execute([$playgroundUserId]);
+            $pgName = $stmtP->fetchColumn() ?: 'Playground Venue';
+
+            $stmtDel = $conn->prepare("DELETE FROM tournament_playground_requests WHERE tournament_id = ? AND playground_user_id = ?");
+            $stmtDel->execute([$tournamentId, $playgroundUserId]);
+
+            if ($stmtDel->rowCount() > 0) {
+                try {
+                    require_once __DIR__ . "/NotificationService.php";
+                    $notif = new NotificationService();
+                    $orgId = (int)($tRow['organizer_id'] ?? 0);
+                    $tTitle = $tRow['title'] ?? 'Tournament';
+                    if ($orgId > 0) {
+                        $notif->sendToUser($orgId, "Playground Venue Hosting Withdrawn 🚪", "Playground venue '{$pgName}' has withdrawn hosting for tournament '{$tTitle}'.", 'TOURNAMENT');
+                    }
+                } catch (Exception $e) {}
+
+                return ["success" => true, "message" => "You have withdrawn your venue hosting successfully."];
+            }
+
+            return ["success" => false, "message" => "No active request found to withdraw."];
+        } catch (Exception $e) {
+            return ["success" => false, "message" => "Error: " . $e->getMessage()];
+        }
+    }
+
+    public function leaveSponsorTournament(int $tournamentId, int $sponsorUserId): array
+    {
+        try {
+            $conn = Database::getConnection();
+
+            $stmtT = $conn->prepare("SELECT title, organizer_id, status, is_finalized, is_draw_finalized FROM tournaments WHERE tournament_id = ?");
+            $stmtT->execute([$tournamentId]);
+            $tRow = $stmtT->fetch(PDO::FETCH_ASSOC);
+
+            if (!$tRow) {
+                return ["success" => false, "message" => "Tournament not found."];
+            }
+
+            $isFinalized = (int)($tRow['is_finalized'] ?? 0) === 1 || 
+                           (int)($tRow['is_draw_finalized'] ?? 0) === 1 || 
+                           in_array(strtoupper((string)($tRow['status'] ?? '')), ['FINALIZED', 'COMPLETED', 'FINISHED']);
+
+            if ($isFinalized) {
+                return ["success" => false, "message" => "Cannot leave: The tournament setup has been finalized by the organizer."];
+            }
+
+            $stmtS = $conn->prepare("SELECT COALESCE(s.company_name, u.email, 'Sponsor') AS sp_name FROM users u LEFT JOIN sponsors s ON u.user_id = s.user_id WHERE u.user_id = ?");
+            $stmtS->execute([$sponsorUserId]);
+            $spName = $stmtS->fetchColumn() ?: 'Sponsor';
+
+            $stmtDel = $conn->prepare("DELETE FROM tournament_sponsor_requests WHERE tournament_id = ? AND sponsor_user_id = ?");
+            $stmtDel->execute([$tournamentId, $sponsorUserId]);
+
+            if ($stmtDel->rowCount() > 0) {
+                try {
+                    require_once __DIR__ . "/NotificationService.php";
+                    $notif = new NotificationService();
+                    $orgId = (int)($tRow['organizer_id'] ?? 0);
+                    $tTitle = $tRow['title'] ?? 'Tournament';
+                    if ($orgId > 0) {
+                        $notif->sendToUser($orgId, "Sponsor Withdrew Sponsorship 🚪", "Sponsor '{$spName}' has withdrawn sponsorship for tournament '{$tTitle}'.", 'TOURNAMENT');
+                    }
+                } catch (Exception $e) {}
+
+                return ["success" => true, "message" => "You have withdrawn your sponsorship request successfully."];
+            }
+
+            return ["success" => false, "message" => "No active sponsorship request found to withdraw."];
+        } catch (Exception $e) {
+            return ["success" => false, "message" => "Error: " . $e->getMessage()];
+        }
+    }
+
+    public function leaveRefereeTournament(int $tournamentId, int $refereeUserId): array
+    {
+        try {
+            $conn = Database::getConnection();
+
+            $stmtT = $conn->prepare("SELECT title, organizer_id, status, is_finalized, is_draw_finalized FROM tournaments WHERE tournament_id = ?");
+            $stmtT->execute([$tournamentId]);
+            $tRow = $stmtT->fetch(PDO::FETCH_ASSOC);
+
+            if (!$tRow) {
+                return ["success" => false, "message" => "Tournament not found."];
+            }
+
+            $isFinalized = (int)($tRow['is_finalized'] ?? 0) === 1 || 
+                           (int)($tRow['is_draw_finalized'] ?? 0) === 1 || 
+                           in_array(strtoupper((string)($tRow['status'] ?? '')), ['FINALIZED', 'COMPLETED', 'FINISHED']);
+
+            if ($isFinalized) {
+                return ["success" => false, "message" => "Cannot leave: The tournament setup has been finalized by the organizer."];
+            }
+
+            $stmtR = $conn->prepare("SELECT COALESCE(r.full_name, u.email, 'Referee') AS ref_name FROM users u LEFT JOIN referees r ON u.user_id = r.user_id WHERE u.user_id = ?");
+            $stmtR->execute([$refereeUserId]);
+            $refName = $stmtR->fetchColumn() ?: 'Referee';
+
+            $stmtDel = $conn->prepare("DELETE FROM tournament_referee_requests WHERE tournament_id = ? AND referee_user_id = ?");
+            $stmtDel->execute([$tournamentId, $refereeUserId]);
+
+            if ($stmtDel->rowCount() > 0) {
+                try {
+                    require_once __DIR__ . "/NotificationService.php";
+                    $notif = new NotificationService();
+                    $orgId = (int)($tRow['organizer_id'] ?? 0);
+                    $tTitle = $tRow['title'] ?? 'Tournament';
+                    if ($orgId > 0) {
+                        $notif->sendToUser($orgId, "Referee Withdrew from Tournament 🚪", "Referee '{$refName}' has withdrawn officiating for tournament '{$tTitle}'.", 'TOURNAMENT');
+                    }
+                } catch (Exception $e) {}
+
+                return ["success" => true, "message" => "You have withdrawn your officiating request successfully."];
+            }
+
+            return ["success" => false, "message" => "No active referee request found to withdraw."];
+        } catch (Exception $e) {
+            return ["success" => false, "message" => "Error: " . $e->getMessage()];
+        }
+    }
+
+    public function recalculateAllTeamRatings(): array
+    {
+        try {
+            $db = Database::getConnection();
+
+            $stmtTeams = $db->query("SELECT user_id, team_name FROM teams");
+            $teams = $stmtTeams->fetchAll(PDO::FETCH_ASSOC);
+
+            if (empty($teams)) {
+                return ["success" => true, "message" => "No teams found."];
+            }
+
+            $stmtTourneys = $db->query("SELECT tournament_id, title, status, is_finalized, draw_data FROM tournaments WHERE draw_data IS NOT NULL AND draw_data != ''");
+            $tournaments = $stmtTourneys->fetchAll(PDO::FETCH_ASSOC);
+
+            $norm = function($str) {
+                if (!$str) return '';
+                if (is_array($str)) {
+                    $str = $str['team_name'] ?? $str['name'] ?? '';
+                }
+                $clean = preg_replace('/\s*\(BYE\)\s*/i', '', (string)$str);
+                return preg_replace('/[^a-zA-Z0-9]/', '', strtolower($clean));
+            };
+
+            $stats = [];
+            foreach ($teams as $t) {
+                $uId = (int)$t['user_id'];
+                $cleanName = trim($t['team_name']);
+
+                $stmtP = $db->prepare("
+                    SELECT COUNT(DISTINCT tournament_id) as count 
+                    FROM tournament_team_requests 
+                    WHERE team_user_id = ? AND UPPER(status) IN ('APPROVED', 'ACCEPTED')
+                ");
+                $stmtP->execute([$uId]);
+                $tPlayed = (int)($stmtP->fetch(PDO::FETCH_ASSOC)['count'] ?? 0);
+
+                $stats[$uId] = [
+                    'user_id' => $uId,
+                    'team_name' => $cleanName,
+                    'norm_name' => $norm($cleanName),
+                    'matches_played' => 0,
+                    'wins' => 0,
+                    'losses' => 0,
+                    'draws' => 0,
+                    'tournaments_played' => $tPlayed,
+                    'tournaments_won' => 0,
+                    'points' => 0,
+                    'win_rate' => 0.00,
+                    'rating' => 0.00,
+                    'rank_position' => 0
+                ];
+            }
+
+            foreach ($tournaments as $tourney) {
+                $drawData = json_decode($tourney['draw_data'], true);
+                if (!$drawData) continue;
+
+                $matchScores = $drawData['matchScores'] ?? [];
+                $bracketWinners = $drawData['bracketWinners'] ?? [];
+                $primaryMatches = $drawData['primaryRoundMatches'] ?? [];
+
+                $matchTeamsMap = [];
+
+                if (isset($primaryMatches[0])) {
+                    $t1 = $norm($primaryMatches[0]['team1'] ?? '');
+                    $t2 = $norm($primaryMatches[0]['team2'] ?? '');
+                    if ($t1 && $t2) {
+                        $matchTeamsMap['groupA_SF'] = [$t1, $t2];
+                        $matchTeamsMap['groupA_QF1'] = [$t1, $t2];
+                    }
+                }
+
+                if (isset($primaryMatches[1])) {
+                    $t1 = $norm($primaryMatches[1]['team1'] ?? '');
+                    $t2 = $norm($primaryMatches[1]['team2'] ?? '');
+                    if ($t1 && $t2) {
+                        $matchTeamsMap['groupB_SF'] = [$t1, $t2];
+                        $matchTeamsMap['groupA_QF2'] = [$t1, $t2];
+                    }
+                }
+
+                $sfA_winner = $norm($bracketWinners['groupA_SF'] ?? '');
+                $sfB_winner = $norm($bracketWinners['groupB_SF'] ?? '');
+                if ($sfA_winner && $sfB_winner) {
+                    $matchTeamsMap['champion'] = [$sfA_winner, $sfB_winner];
+                    $matchTeamsMap['final'] = [$sfA_winner, $sfB_winner];
+                }
+
+                foreach ($matchScores as $matchKey => $scoreObj) {
+                    if (!is_array($scoreObj)) continue;
+
+                    $winnerNorm = $norm($scoreObj['winner'] ?? '');
+                    if (empty($winnerNorm)) continue;
+
+                    $t1Norm = $norm($scoreObj['team1'] ?? $scoreObj['t1'] ?? '');
+                    $t2Norm = $norm($scoreObj['team2'] ?? $scoreObj['t2'] ?? '');
+
+                    if ((empty($t1Norm) || empty($t2Norm)) && isset($matchTeamsMap[$matchKey])) {
+                        $t1Norm = $matchTeamsMap[$matchKey][0];
+                        $t2Norm = $matchTeamsMap[$matchKey][1];
+                    }
+
+                    foreach ($stats as $uId => &$s) {
+                        $nName = $s['norm_name'];
+
+                        if ($nName === $t1Norm || $nName === $t2Norm || $nName === $winnerNorm) {
+                            if ($nName === $winnerNorm) {
+                                $s['matches_played'] += 1;
+                                $s['wins'] += 1;
+                                $s['points'] += 3;
+                            } else if ($t1Norm && $t2Norm && ($nName === $t1Norm || $nName === $t2Norm)) {
+                                $s['matches_played'] += 1;
+                                $s['losses'] += 1;
+                            }
+                        }
+                    }
+                    unset($s);
+                }
+
+                $championNorm = $norm($bracketWinners['champion'] ?? $drawData['winner'] ?? '');
+                $runnerUpNorm = $norm($bracketWinners['runnerUp'] ?? '');
+
+                if (!empty($championNorm)) {
+                    foreach ($stats as $uId => &$s) {
+                        if ($s['norm_name'] === $championNorm) {
+                            $s['points'] += 10;
+                            $s['tournaments_won'] += 1;
+                        } else if (!empty($runnerUpNorm) && $s['norm_name'] === $runnerUpNorm) {
+                            $s['points'] += 5;
+                        }
+                    }
+                    unset($s);
+                }
+            }
+
+            foreach ($stats as $uId => &$s) {
+                $mp = $s['matches_played'];
+                $w = $s['wins'];
+
+                if ($mp > 0) {
+                    $s['win_rate'] = round(($w / $mp) * 100, 2);
+                    $ratingVal = 2.50 + (($s['win_rate'] / 100) * 2.00) + min(0.50, $w * 0.10);
+                    $s['rating'] = round(min(5.00, max(1.00, $ratingVal)), 1);
+                } else {
+                    $s['win_rate'] = 0.00;
+                    $s['rating'] = 0.00;
+                }
+            }
+            unset($s);
+
+            usort($stats, function($a, $b) {
+                if ($a['points'] !== $b['points']) return $b['points'] <=> $a['points'];
+                if ($a['rating'] !== $b['rating']) return $b['rating'] <=> $a['rating'];
+                if ($a['win_rate'] !== $b['win_rate']) return $b['win_rate'] <=> $a['win_rate'];
+                return $b['wins'] <=> $a['wins'];
+            });
+
+            $stmtUp = $db->prepare("
+                UPDATE teams 
+                SET points = ?, matches_played = ?, wins = ?, losses = ?, draws = ?, win_rate = ?, rating = ?, rank_position = ?, tournaments_played = ?, tournaments_won = ? 
+                WHERE user_id = ?
+            ");
+
+            $rank = 1;
+            foreach ($stats as &$s) {
+                $s['rank_position'] = $s['matches_played'] > 0 ? $rank++ : 0;
+                $stmtUp->execute([
+                    $s['points'],
+                    $s['matches_played'],
+                    $s['wins'],
+                    $s['losses'],
+                    $s['draws'],
+                    $s['win_rate'],
+                    $s['rating'],
+                    $s['rank_position'],
+                    $s['tournaments_played'],
+                    $s['tournaments_won'],
+                    $s['user_id']
+                ]);
+            }
+
+            return ["success" => true, "data" => $stats];
+        } catch (Exception $e) {
+            return ["success" => false, "message" => "Error recalculating team ratings: " . $e->getMessage()];
         }
     }
 }
