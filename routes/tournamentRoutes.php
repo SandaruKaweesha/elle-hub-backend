@@ -320,4 +320,19 @@ $router->get(
 $router->get(
     "/team/{id}/history",
     [TournamentController::class, "getTeamTournamentHistory"]
-);
+);
+// Tournament Deletion Admin Approval System
+$router->post(
+    "/organizer/tournament/{id}/request-deletion",
+    [TournamentController::class, "requestTournamentDeletion"]
+);
+
+$router->post(
+    "/admin/tournament/{id}/approve-deletion",
+    [TournamentController::class, "approveTournamentDeletion"]
+);
+
+$router->post(
+    "/admin/tournament/{id}/reject-deletion",
+    [TournamentController::class, "rejectTournamentDeletion"]
+);
