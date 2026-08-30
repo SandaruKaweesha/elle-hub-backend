@@ -11,6 +11,79 @@ class CertificateService
         $this->repository = new CertificateRepository();
     }
 
+    public function generateSingleCertificate(array $data): array
+    {
+        try {
+            $conn = Database::getConnection();
+
+            $tournamentId = isset($data['tournamentId']) ? (int)$data['tournamentId'] : (isset($data['tournament_id']) ? (int)$data['tournament_id'] : 0);
+            $tournamentTitle = trim($data['tournament'] ?? $data['tournament_title'] ?? '');
+            $recipient = trim($data['recipient'] ?? $data['recipient_name'] ?? '');
+            $certType = strtoupper(trim($data['cert_type'] ?? $data['certificate_type'] ?? 'PARTICIPATION'));
+
+            if (!$tournamentId && $tournamentTitle) {
+                $tStmt = $conn->prepare("SELECT tournament_id, title, location, start_date, tournament_held_date FROM tournaments WHERE LOWER(title) = LOWER(?) LIMIT 1");
+                $tStmt->execute([$tournamentTitle]);
+                $tRow = $tStmt->fetch(PDO::FETCH_ASSOC);
+                if ($tRow) {
+                    $tournamentId = (int)$tRow['tournament_id'];
+                }
+            }
+
+            if (!$tournamentId) {
+                $tStmt = $conn->query("SELECT tournament_id, title, location, start_date, tournament_held_date FROM tournaments ORDER BY tournament_id DESC LIMIT 1");
+                $tRow = $tStmt->fetch(PDO::FETCH_ASSOC);
+                if ($tRow) {
+                    $tournamentId = (int)$tRow['tournament_id'];
+                    $tournamentTitle = $tRow['title'];
+                }
+            }
+
+            if (!$tournamentId || !$recipient) {
+                return ["success" => false, "message" => "Tournament and recipient name are required."];
+            }
+
+            // Fetch tournament details
+            $tStmt = $conn->prepare("SELECT tournament_id, title, location, start_date, tournament_held_date FROM tournaments WHERE tournament_id = ?");
+            $tStmt->execute([$tournamentId]);
+            $tourney = $tStmt->fetch(PDO::FETCH_ASSOC);
+
+            $issueDate = !empty($tourney['tournament_held_date']) ? $tourney['tournament_held_date'] : (!empty($tourney['start_date']) ? $tourney['start_date'] : date('Y-m-d'));
+            $token = "CERT-ELE-" . date('Y') . "-" . strtoupper(substr(md5(uniqid($tournamentId . $recipient, true)), 0, 8));
+
+            $cert = new Certificate(
+                null,
+                $token,
+                $tournamentId,
+                $recipient,
+                0,
+                $certType,
+                $issueDate
+            );
+
+            if ($this->repository->save($cert)) {
+                return [
+                    "success" => true,
+                    "message" => "Single E-Certificate generated successfully!",
+                    "data" => [
+                        "id" => $token,
+                        "token" => $token,
+                        "verify_link" => "/verify-certificate/" . $token,
+                        "recipient_name" => $recipient,
+                        "certificate_type" => $certType,
+                        "tournament_title" => $tourney['title'] ?? $tournamentTitle,
+                        "tournament_location" => $tourney['location'] ?? 'Sri Lanka',
+                        "issue_date" => $issueDate
+                    ]
+                ];
+            }
+
+            return ["success" => false, "message" => "Failed to save certificate record."];
+        } catch (Exception $e) {
+            return ["success" => false, "message" => "Error generating certificate: " . $e->getMessage()];
+        }
+    }
+
     public function generateTournamentCertificates(int $tournamentId): array
     {
         try {
@@ -106,17 +179,18 @@ class CertificateService
                     "success" => true,
                     "valid" => true,
                     "verified_by" => "Elle Hub Official E-Certificate Verification System",
-                    "badge" => "Verified by Elle Hub",
+                    "badge" => "Verified by Elle Hub Database",
                     "data" => [
                         "certificate_id" => $certData['certificate_id'],
                         "verification_token" => $certData['verification_token'],
                         "recipient_name" => $certData['recipient_name'],
                         "tournament_title" => $certData['tournament_title'],
-                        "tournament_location" => $certData['tournament_location'] ?? 'Sri Lanka',
+                        "tournament_location" => $certData['tournament_location'] ?? 'Sri Lanka Ground',
                         "certificate_type" => $certData['certificate_type'],
                         "issue_date" => $certData['issue_date'],
                         "created_at" => $certData['created_at'],
-                        "organizer_name" => $certData['organizer_name'] ?? 'Elle Hub Official'
+                        "organizer_name" => $certData['organizer_name'] ?? 'Elle Hub Official Organizer',
+                        "sponsor_name" => $certData['sponsor_name'] ?? 'Official Tournament Sponsors'
                     ]
                 ];
             }

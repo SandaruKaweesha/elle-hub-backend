@@ -12,10 +12,22 @@ class CertificateController
         $this->service = new CertificateService();
     }
 
-    public function generate($tournamentId)
+    public function generate($tournamentId = null)
     {
         header(self::JSON_HEADER);
-        $result = $this->service->generateTournamentCertificates((int)$tournamentId);
+        $input = json_decode(file_get_contents('php://input'), true) ?? [];
+
+        if (!empty($input['recipient']) || !empty($input['recipient_name'])) {
+            if ($tournamentId && empty($input['tournamentId']) && empty($input['selectedTournamentId'])) {
+                $input['tournamentId'] = (int)$tournamentId;
+            }
+            $result = $this->service->generateSingleCertificate($input);
+        } else if ($tournamentId) {
+            $result = $this->service->generateTournamentCertificates((int)$tournamentId);
+        } else {
+            $result = ["success" => false, "message" => "Invalid tournament ID or certificate payload."];
+        }
+
         if ($result['success']) {
             http_response_code(200);
         } else {

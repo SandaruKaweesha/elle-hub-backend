@@ -35,16 +35,20 @@ class CertificateRepository
                          c.certificate_type, c.issue_date, c.created_at,
                          t.title AS tournament_title, t.location AS tournament_location, 
                          t.start_date, t.end_date, t.tournament_held_date,
-                         COALESCE(org_user.email, 'Elle Hub Official') AS organizer_name
+                         COALESCE(org_user.email, 'Elle Hub Official Organizer') AS organizer_name,
+                         COALESCE(sp.company_name, 'Official Tournament Sponsors') AS sponsor_name
                   FROM certificates c
                   JOIN tournaments t ON c.tournament_id = t.tournament_id
                   LEFT JOIN users org_user ON t.organizer_id = org_user.user_id
-                  WHERE c.verification_token = :token OR c.certificate_id = :token_id";
+                  LEFT JOIN tournament_sponsor_requests tsr ON (t.tournament_id = tsr.tournament_id AND (UPPER(tsr.status) = 'ACCEPTED' OR UPPER(tsr.status) = 'APPROVED'))
+                  LEFT JOIN sponsors sp ON tsr.sponsor_user_id = sp.user_id
+                  WHERE c.verification_token = :token OR c.certificate_id = :token_id OR c.verification_token LIKE :like_token";
 
         $stmt = $this->db->prepare($query);
         $stmt->execute([
             ':token' => $token,
-            ':token_id' => is_numeric($token) ? (int)$token : -1
+            ':token_id' => is_numeric($token) ? (int)$token : -1,
+            ':like_token' => '%' . $token . '%'
         ]);
 
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -59,6 +63,7 @@ class CertificateRepository
             $row['tournamentTitle'] = $row['tournament_title'];
             $row['tournamentLocation'] = $row['tournament_location'];
             $row['organizerName'] = $row['organizer_name'];
+            $row['sponsorName'] = $row['sponsor_name'];
         }
         return $row ?: null;
     }
