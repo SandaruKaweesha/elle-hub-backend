@@ -8,7 +8,7 @@ class UserRepository{
         $this->connection = Database::getConnection();
     }
     public function existsByEmail(string $email): bool  {
-        $sql = "SELECT COUNT(*) FROM users WHERE email = :email";
+        $sql = "SELECT COUNT(*) FROM users WHERE LOWER(TRIM(email)) = LOWER(TRIM(:email))";
         $statement = $this->connection->prepare($sql);
 
         $statement->bindValue(":email", $email);
@@ -16,6 +16,42 @@ class UserRepository{
         $count = $statement->fetchColumn();
 
         return $count > 0;
+    }
+
+    public function existsByContactNumber(string $contactNumber): bool {
+        if (empty(trim($contactNumber))) {
+            return false;
+        }
+
+        $cleanNumber = preg_replace('/[^0-9]/', '', $contactNumber);
+        $last9 = strlen($cleanNumber) >= 9 ? substr($cleanNumber, -9) : $cleanNumber;
+
+        if (empty($last9)) {
+            return false;
+        }
+
+        $tables = ['teams', 'organizers', 'sponsors', 'referees', 'playgrounds'];
+        foreach ($tables as $table) {
+            try {
+                $sql = "SELECT contact_number FROM `$table` WHERE contact_number IS NOT NULL AND contact_number != ''";
+                $stmt = $this->connection->prepare($sql);
+                $stmt->execute();
+                $rows = $stmt->fetchAll(PDO::FETCH_COLUMN);
+                foreach ($rows as $row) {
+                    $rowClean = preg_replace('/[^0-9]/', '', (string)$row);
+                    if (!empty($rowClean)) {
+                        $rowLast9 = strlen($rowClean) >= 9 ? substr($rowClean, -9) : $rowClean;
+                        if ($rowLast9 === $last9) {
+                            return true;
+                        }
+                    }
+                }
+            } catch (Exception $e) {
+                // Table or column might not exist in edge cases
+                continue;
+            }
+        }
+        return false;
     }
 
     public function save(User $user):int{
@@ -380,34 +416,5 @@ class UserRepository{
         $statement->bindValue(':user_id', $userId, PDO::PARAM_INT);
         $statement->execute();
         return $statement->rowCount() > 0;
-    }
-
-    public function existsByContactNumber(string $contactNumber): bool
-    {
-        $cleanNumber = preg_replace('/[^0-9]/', '', $contactNumber);
-        if (empty($cleanNumber)) {
-            return false;
-        }
-        // Extract last 9 digits (e.g. 771234567 from +94771234567 or 0771234567)
-        $shortNumber = strlen($cleanNumber) >= 9 ? substr($cleanNumber, -9) : $cleanNumber;
-        $paramPattern = "%" . $shortNumber;
-
-        $sql = "SELECT COUNT(*) FROM (
-                    SELECT contact_number FROM teams WHERE contact_number LIKE ?
-                    UNION ALL
-                    SELECT contact_number FROM organizers WHERE contact_number LIKE ?
-                    UNION ALL
-                    SELECT contact_number FROM referees WHERE contact_number LIKE ?
-                    UNION ALL
-                    SELECT contact_number FROM sponsors WHERE contact_number LIKE ?
-                    UNION ALL
-                    SELECT contact_number FROM playgrounds WHERE contact_number LIKE ?
-                ) AS combined";
-
-        $statement = $this->connection->prepare($sql);
-        $statement->execute([$paramPattern, $paramPattern, $paramPattern, $paramPattern, $paramPattern]);
-        $count = (int) $statement->fetchColumn();
-
-        return $count > 0;
     }
 }
