@@ -29,7 +29,48 @@ class UserService{
 
     public function registerUser(User $user)
     {
-        // Check whether the email already exists
+        // 1. Validate Name starting character (must start with an alphabetical letter A-Z or a-z)
+        $nameToValidate = null;
+        if ($user instanceof Admin || $user instanceof Referee) {
+            $nameToValidate = method_exists($user, 'getFullName') ? $user->getFullName() : null;
+        } elseif ($user instanceof Team) {
+            $nameToValidate = method_exists($user, 'getTeamName') ? $user->getTeamName() : null;
+        } elseif ($user instanceof Organizer) {
+            $nameToValidate = method_exists($user, 'getOrganizationName') ? $user->getOrganizationName() : null;
+        } elseif ($user instanceof Sponsor) {
+            $nameToValidate = method_exists($user, 'getCompanyName') ? $user->getCompanyName() : null;
+        } elseif ($user instanceof Playground) {
+            $nameToValidate = method_exists($user, 'getPlaygroundName') ? $user->getPlaygroundName() : null;
+        }
+
+        if (!empty($nameToValidate) && !preg_match('/^[a-zA-Z]/', trim($nameToValidate))) {
+            return [
+                "success" => false,
+                "message" => "Name must start with an alphabetical letter (a-z, A-Z)."
+            ];
+        }
+
+        // 2. Validate Password Strength (At least 6 characters, must include both letters and numbers)
+        $rawPassword = $user->getPassword();
+        if (empty($rawPassword) || strlen($rawPassword) < 6 || !preg_match('/[a-zA-Z]/', $rawPassword) || !preg_match('/[0-9]/', $rawPassword)) {
+            return [
+                "success" => false,
+                "message" => "Password must be at least 6 characters long and include both letters and numbers."
+            ];
+        }
+
+        // 2b. Validate Playground Area (Numbers only)
+        if ($user instanceof Playground) {
+            $area = method_exists($user, 'getArea') ? $user->getArea() : null;
+            if (!empty($area) && !preg_match('/^[0-9]+$/', trim($area))) {
+                return [
+                    "success" => false,
+                    "message" => "Playground Area must contain numbers only (e.g. 500)."
+                ];
+            }
+        }
+
+        // 3. Check whether the email already exists
         if ($this->userRepository->existsByEmail($user->getEmail())) {
             return [
                 "success" => false,
