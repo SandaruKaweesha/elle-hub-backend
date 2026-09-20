@@ -14,6 +14,7 @@ class Database
             $database = "ellehubnew"; // Change if your local DB has a different name
             $username = "root";
             $password = "1234";
+            $password = "12345";
 
             $dsn = "mysql:host=$host;port=$port;dbname=$database;charset=utf8mb4";
 
