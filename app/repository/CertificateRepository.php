@@ -71,9 +71,15 @@ class CertificateRepository
 
     public function findByTournamentId(int $tournamentId): array
     {
-        $query = "SELECT c.*, t.title AS tournament_title 
+        $query = "SELECT c.*, t.title AS tournament_title, t.location AS tournament_location,
+                         t.start_date, t.end_date, t.tournament_held_date,
+                         COALESCE(org_user.email, 'Elle Hub Official Organizer') AS organizer_name,
+                         COALESCE(sp.company_name, 'Official Tournament Sponsors') AS sponsor_name
                   FROM certificates c 
                   JOIN tournaments t ON c.tournament_id = t.tournament_id
+                  LEFT JOIN users org_user ON t.organizer_id = org_user.user_id
+                  LEFT JOIN tournament_sponsor_requests tsr ON (t.tournament_id = tsr.tournament_id AND (UPPER(tsr.status) = 'ACCEPTED' OR UPPER(tsr.status) = 'APPROVED'))
+                  LEFT JOIN sponsors sp ON tsr.sponsor_user_id = sp.user_id
                   WHERE c.tournament_id = :tournament_id 
                   ORDER BY c.created_at DESC";
 
@@ -90,6 +96,9 @@ class CertificateRepository
             $row['certificateType'] = $row['certificate_type'];
             $row['issueDate'] = $row['issue_date'];
             $row['tournamentTitle'] = $row['tournament_title'];
+            $row['tournamentLocation'] = $row['tournament_location'];
+            $row['organizerName'] = $row['organizer_name'];
+            $row['sponsorName'] = $row['sponsor_name'];
         }
         return $rows;
     }

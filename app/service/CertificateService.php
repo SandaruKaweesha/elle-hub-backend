@@ -62,13 +62,22 @@ class CertificateService
             );
 
             if ($this->repository->save($cert)) {
+$payloadB64 = rtrim(strtr(base64_encode(json_encode([
+                    "recipient" => $recipient,
+                    "tournament" => $tourney['title'] ?? $tournamentTitle,
+                    "award" => $certType,
+                    "date" => $issueDate,
+                    "location" => $tourney['location'] ?? 'Sri Lanka',
+                    "sponsor" => "Official Tournament Sponsors"
+                ])), '+/', '-_'), '=');
+                $verifyLink = "https://sandarukaweesha.github.io/elle-hub-frontend/#/verify-certificate/" . $token . "?d=" . urlencode($payloadB64);
                 return [
                     "success" => true,
                     "message" => "Single E-Certificate generated successfully!",
                     "data" => [
                         "id" => $token,
                         "token" => $token,
-                        "verify_link" => "/verify-certificate/" . $token,
+                        "verify_link" => $verifyLink,
                         "recipient_name" => $recipient,
                         "certificate_type" => $certType,
                         "tournament_title" => $tourney['title'] ?? $tournamentTitle,
